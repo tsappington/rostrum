@@ -1,0 +1,416 @@
+<title>Rostrum Ink Capture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Lora:ital@0;1&display=swap">
+<style>
+/* Rostrum Ink Capture — handwriting stroke recorder for the rostrum pipeline.
+   Single-theme by design: this is a lit paper desk, used pen-in-hand in a
+   bright room, and its strokes land on a cream worksheet. Palette and type
+   are the worksheet's own (see rostrum/brand.py). */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --paper: #F9F7F0; --card: #FFFFFF; --navy: #384652; --navy-soft: #5A6770;
+  --orange: #FAA438; --ink: #2D5FA8; --guide: #DAD3C6; --line: #E7E1D5;
+  --good: #4C8A5C;
+}
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--paper); color: var(--navy);
+  font-family: "Barlow Semi Condensed", "Avenir Next Condensed", sans-serif;
+  min-height: 100vh; overscroll-behavior: none;
+}
+#app { max-width: 900px; margin: 0 auto; padding: 14px 16px 40px; }
+header { display: flex; align-items: baseline; gap: 12px; padding: 4px 2px 12px; }
+.wordmark { font-weight: 700; font-size: 17px; letter-spacing: .02em; }
+.wordmark span { color: var(--orange); }
+.progress { margin-left: auto; font-size: 13px; color: var(--navy-soft);
+  font-variant-numeric: tabular-nums; }
+.promptbar { display: flex; align-items: center; gap: 14px; padding: 6px 2px 10px; }
+.nav { border: 1.5px solid var(--navy); background: var(--card); color: var(--navy);
+  border-radius: 8px; font: 600 14px "Barlow Semi Condensed"; padding: 8px 14px; }
+.nav:disabled { opacity: .35; }
+.prompt-display { flex: 1; text-align: center; font-weight: 600; font-size: 40px;
+  letter-spacing: .04em; line-height: 1.1; }
+.prompt-display small { display: block; font: italic 400 13px/1.4 Lora, serif;
+  color: var(--navy-soft); letter-spacing: 0; margin-top: 2px; }
+.optional-tag { font-size: 11px; font-weight: 600; letter-spacing: .08em;
+  color: var(--orange); text-transform: uppercase; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(56,70,82,.06); position: relative; }
+#stage { touch-action: none; display: block; width: 100%; height: 340px;
+  border-radius: 12px; cursor: crosshair; }
+.stage-hint { position: absolute; top: 10px; right: 14px; font: italic 400 12px Lora, serif;
+  color: var(--navy-soft); pointer-events: none; }
+.rec { position: absolute; top: 12px; left: 14px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--orange); opacity: 0; transition: opacity .15s;
+  pointer-events: none; }
+.rec.on { opacity: 1; }
+.controls { display: flex; gap: 10px; align-items: center; padding: 12px 2px; flex-wrap: wrap; }
+button.act { border: none; border-radius: 8px; font: 600 15px "Barlow Semi Condensed";
+  padding: 11px 18px; color: #fff; background: var(--navy); }
+button.act.primary { background: var(--ink); }
+button.act.warn { background: var(--card); color: var(--navy); border: 1.5px solid var(--navy); }
+button.act:disabled { opacity: .35; }
+button:active { transform: translateY(1px); }
+.takes { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px; min-height: 40px; }
+.take-chip { display: flex; align-items: center; gap: 7px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px 6px 13px;
+  font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.take-chip button { border: none; background: none; font-size: 14px; padding: 2px;
+  color: var(--navy-soft); }
+.take-chip .star.on { color: var(--orange); }
+.savebar { margin-top: 18px; padding: 14px; display: flex; gap: 10px; align-items: center;
+  flex-wrap: wrap; }
+.savebar .status { font: italic 400 13px/1.45 Lora, serif; color: var(--navy-soft);
+  flex: 1; min-width: 180px; }
+.toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  background: var(--navy); color: #fff; border-radius: 999px; padding: 10px 20px;
+  font: 600 14px "Barlow Semi Condensed"; opacity: 0; transition: opacity .25s;
+  pointer-events: none; max-width: 90vw; text-align: center; }
+.toast.show { opacity: 1; }
+.finger-row { display: flex; align-items: center; gap: 8px; margin-left: auto;
+  font-size: 13px; color: var(--navy-soft); }
+@media (max-width: 640px) {
+  .prompt-display { font-size: 30px; }
+  #stage { height: 280px; }
+}
+</style>
+
+<div id="app">
+  <header>
+    <div class="wordmark">rostrum <span>·</span> ink capture</div>
+    <div class="progress" id="progress"></div>
+  </header>
+
+  <div class="promptbar">
+    <button class="nav" id="prev">‹ Prev</button>
+    <div class="prompt-display" id="prompt"></div>
+    <button class="nav" id="next">Next ›</button>
+  </div>
+
+  <div class="card">
+    <canvas id="stage"></canvas>
+    <div class="rec" id="rec"></div>
+    <div class="stage-hint">write with the pencil, at natural speed</div>
+  </div>
+
+  <div class="controls">
+    <button class="act warn" id="retry">Retry</button>
+    <button class="act warn" id="undo">Undo stroke</button>
+    <button class="act primary" id="keep">Keep take</button>
+    <label class="finger-row"><input type="checkbox" id="allowTouch"> allow finger</label>
+  </div>
+
+  <div class="takes" id="takes"></div>
+
+  <div class="card savebar">
+    <div class="status" id="status">Write each prompt a couple of times, keep the takes
+      you like, star the best one, then save. The extras after the required set are
+      optional insurance.</div>
+    <button class="act" id="export" hidden>Export file</button>
+    <button class="act warn" id="copy" hidden>Copy JSON</button>
+    <button class="act primary" id="save">Save to Claude</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script id="strokes-data" type="application/json">{}</script>
+<script id="app-code">
+"use strict";
+/* Captured before any render mutates it, so a published copy always carries
+   pristine markup (the contract warns against serializing the live DOM). */
+const APP_HTML = document.getElementById("app").innerHTML;
+
+/* ---------- prompt script: the actual ink performances of the lesson ---------- */
+const PROMPTS = [
+  { id: "eq",   d: "3 × 4 = 12", hint: "the Do Now equation, one flowing line", req: 1 },
+  { id: "n12",  d: "12", hint: "squares in all / volume", req: 1 },
+  { id: "n8",   d: "8",  hint: "4 × 2", req: 1 },
+  { id: "n10",  d: "10", hint: "2 × 5 / the area answer", req: 1 },
+  { id: "n30",  d: "30", hint: "5 × 6", req: 1 },
+  { id: "n28",  d: "28", hint: "4 × 7", req: 1 },
+  { id: "n1",   d: "1",  hint: "number of layers", req: 1 },
+  { id: "n2",   d: "2",  hint: "number of layers", req: 1 },
+  { id: "n3",   d: "3",  hint: "number of layers", req: 1 },
+  { id: "n4",   d: "4",  hint: "cubes per layer", req: 1 },
+  { id: "n24",  d: "24", hint: "12 × 2", req: 1 },
+  { id: "n20",  d: "20", hint: "5 × 4", req: 1 },
+  { id: "n40",  d: "40", hint: "20 × 2", req: 1 },
+  { id: "g0",   d: "0", hint: "extra: lone zero", req: 0 },
+  { id: "g5",   d: "5", hint: "extra", req: 0 },
+  { id: "g6",   d: "6", hint: "extra", req: 0 },
+  { id: "g7",   d: "7", hint: "extra", req: 0 },
+  { id: "g9",   d: "9", hint: "extra", req: 0 },
+  { id: "mUnder", d: "—", hint: "extra: a quick underline, left to right", req: 0 },
+  { id: "mCircle", d: "◯", hint: "extra: circle something, one motion", req: 0 },
+  { id: "mDot", d: "•", hint: "extra: a counting tap", req: 0 },
+  { id: "mCheck", d: "✓", hint: "extra: a small check mark", req: 0 },
+];
+
+/* ---------- state ---------- */
+const $ = (id) => document.getElementById(id);
+const stage = $("stage"), ctx = stage.getContext("2d");
+let store = { version: 1, savedAt: null, device: null, guide: null, prompts: {} };
+let cur = 0;                 // prompt index
+let take = null;             // in-progress take {t0, strokes:[{points:[[x,y,t,p]]}]}
+let liveStroke = null;
+let replaying = false;
+
+/* ---------- persistence: embedded data block, localStorage draft ---------- */
+function loadStore() {
+  let embedded = {};
+  try { embedded = JSON.parse($("strokes-data").textContent || "{}"); } catch (e) {}
+  let draft = null;
+  try { draft = JSON.parse(localStorage.getItem("rostrum-capture") || "null"); } catch (e) {}
+  const newer = (a, b) => (a?.savedAt || 0) >= (b?.savedAt || 0) ? a : b;
+  const picked = draft && embedded.prompts ? newer(draft, embedded) : (draft || embedded);
+  if (picked && picked.prompts) store = picked;
+}
+function draftSave() {
+  store.savedAt = Date.now();
+  try { localStorage.setItem("rostrum-capture", JSON.stringify(store)); } catch (e) {}
+}
+
+/* ---------- canvas ---------- */
+function sizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const r = stage.getBoundingClientRect();
+  stage.width = Math.round(r.width * dpr);
+  stage.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  store.guide = { w: Math.round(r.width), h: Math.round(r.height),
+    baseline: Math.round(r.height * 0.66), cap: Math.round(r.height * 0.22),
+    xheight: Math.round(r.height * 0.44) };
+  redraw();
+}
+function guides() {
+  const g = store.guide, w = g.w;
+  ctx.save();
+  ctx.strokeStyle = "#DAD3C6"; ctx.lineWidth = 1; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(24, g.baseline); ctx.lineTo(w - 24, g.baseline); ctx.stroke();
+  ctx.setLineDash([3, 6]); ctx.strokeStyle = "#E7E1D5";
+  for (const y of [g.cap, g.xheight]) {
+    ctx.beginPath(); ctx.moveTo(24, y); ctx.lineTo(w - 24, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawStroke(s, upto) {
+  const pts = upto == null ? s.points : s.points.slice(0, upto);
+  if (pts.length < 1) return;
+  ctx.save();
+  ctx.strokeStyle = "#2D5FA8"; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i][3] || 0.5;
+    ctx.lineWidth = 2.1 * (0.55 + 0.9 * p);
+    ctx.beginPath(); ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
+    ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke();
+  }
+  if (pts.length === 1) {
+    ctx.fillStyle = "#2D5FA8";
+    ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1], 1.2, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+function redraw() {
+  ctx.clearRect(0, 0, store.guide.w, store.guide.h);
+  guides();
+  if (take) for (const s of take.strokes) drawStroke(s);
+  if (liveStroke) drawStroke(liveStroke);
+}
+
+/* ---------- capture ---------- */
+function pointerOK(e) {
+  if (e.pointerType === "pen" || e.pointerType === "mouse") return true;
+  return $("allowTouch").checked;
+}
+stage.addEventListener("pointerdown", (e) => {
+  if (replaying || !pointerOK(e)) return;
+  e.preventDefault();
+  stage.setPointerCapture(e.pointerId);
+  if (!take) take = { t0: e.timeStamp, strokes: [] };
+  liveStroke = { points: [] };
+  addPoint(e);
+  $("rec").classList.add("on");
+});
+stage.addEventListener("pointermove", (e) => {
+  if (!liveStroke || replaying || !pointerOK(e)) return;
+  e.preventDefault();
+  const evts = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  for (const ev of evts) addPoint(ev);
+  redraw();
+});
+function endStroke(e) {
+  if (!liveStroke) return;
+  if (liveStroke.points.length > 0) take.strokes.push(liveStroke);
+  liveStroke = null;
+  $("rec").classList.remove("on");
+  redraw(); syncButtons();
+}
+stage.addEventListener("pointerup", endStroke);
+stage.addEventListener("pointercancel", endStroke);
+function addPoint(e) {
+  const r = stage.getBoundingClientRect();
+  liveStroke.points.push([
+    +(e.clientX - r.left).toFixed(2), +(e.clientY - r.top).toFixed(2),
+    Math.round(e.timeStamp - take.t0), +(e.pressure || 0.5).toFixed(3),
+  ]);
+}
+
+/* ---------- takes ---------- */
+function promptStore() {
+  const p = PROMPTS[cur];
+  return store.prompts[p.id] || (store.prompts[p.id] = { display: p.d, takes: [] });
+}
+function keepTake() {
+  if (!take || !take.strokes.length) return;
+  const ps = promptStore();
+  const dur = take.strokes.at(-1).points.at(-1)[2];
+  ps.takes.forEach((t) => (t.starred = false));
+  ps.takes.push({ at: Date.now(), duration: dur, starred: true, strokes: take.strokes });
+  take = null; draftSave(); redraw(); renderTakes(); syncButtons();
+  toast(`Kept — take ${ps.takes.length} of “${PROMPTS[cur].d}”`);
+}
+function renderTakes() {
+  const ps = store.prompts[PROMPTS[cur].id];
+  const el = $("takes"); el.innerHTML = "";
+  (ps ? ps.takes : []).forEach((t, i) => {
+    const chip = document.createElement("div");
+    chip.className = "take-chip";
+    chip.innerHTML = `<span>take ${i + 1} · ${(t.duration / 1000).toFixed(1)}s</span>
+      <button title="replay" data-a="play">▶</button>
+      <button title="best take" class="star ${t.starred ? "on" : ""}" data-a="star">★</button>
+      <button title="delete" data-a="del">✕</button>`;
+    chip.addEventListener("click", (e) => {
+      const a = e.target.dataset.a;
+      if (a === "play") replay(t);
+      if (a === "star") { ps.takes.forEach((x) => (x.starred = false)); t.starred = true; draftSave(); renderTakes(); }
+      if (a === "del") { ps.takes.splice(i, 1); if (t.starred && ps.takes.length) ps.takes.at(-1).starred = true; draftSave(); renderTakes(); updateProgress(); syncButtons(); }
+    });
+    el.appendChild(chip);
+  });
+  updateProgress();
+}
+function replay(t) {
+  if (replaying) return;
+  replaying = true; take = null; liveStroke = null;
+  const t0 = performance.now();
+  const tick = (now) => {
+    const el = now - t0;
+    ctx.clearRect(0, 0, store.guide.w, store.guide.h); guides();
+    let done = true;
+    for (const s of t.strokes) {
+      let n = 0;
+      while (n < s.points.length && s.points[n][2] <= el) n++;
+      if (n < s.points.length) done = false;
+      drawStroke(s, n);
+    }
+    if (!done) requestAnimationFrame(tick);
+    else { replaying = false; setTimeout(redraw, 900); }
+  };
+  requestAnimationFrame(tick);
+}
+
+/* ---------- navigation & chrome ---------- */
+function show(i) {
+  cur = Math.max(0, Math.min(PROMPTS.length - 1, i));
+  const p = PROMPTS[cur];
+  $("prompt").innerHTML = `${p.req ? "" : `<span class="optional-tag">extra</span> `}${p.d}
+    <small>${p.hint}</small>`;
+  $("prev").disabled = cur === 0;
+  $("next").disabled = cur === PROMPTS.length - 1;
+  take = null; liveStroke = null;
+  redraw(); renderTakes(); syncButtons();
+}
+function updateProgress() {
+  const req = PROMPTS.filter((p) => p.req);
+  const done = req.filter((p) => store.prompts[p.id]?.takes.length).length;
+  const extras = PROMPTS.filter((p) => !p.req && store.prompts[p.id]?.takes.length).length;
+  $("progress").textContent = `${done}/${req.length} required · ${extras} extras`;
+}
+function syncButtons() {
+  const drawing = take && take.strokes.length;
+  $("keep").disabled = !drawing;
+  $("retry").disabled = !drawing;
+  $("undo").disabled = !drawing;
+}
+function toast(msg, ms = 2200) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._h); toast._h = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+$("prev").addEventListener("click", () => show(cur - 1));
+$("next").addEventListener("click", () => show(cur + 1));
+$("keep").addEventListener("click", keepTake);
+$("retry").addEventListener("click", () => { take = null; liveStroke = null; redraw(); syncButtons(); });
+$("undo").addEventListener("click", () => { if (take) { take.strokes.pop(); redraw(); syncButtons(); } });
+
+/* ---------- export: publish to Claude, download, clipboard ---------- */
+function payload() {
+  store.savedAt = Date.now();
+  store.device = { ua: navigator.userAgent, dpr: window.devicePixelRatio || 1 };
+  return JSON.stringify(store);
+}
+function buildSource(dataJson) {
+  const style = document.querySelector("style").textContent;
+  const code = $("app-code").textContent;
+  const appHtml = '<div id="app">' + APP_HTML + "</div>";
+  const CLOSE = "</scr" + "ipt>";
+  return `<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rostrum Ink Capture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Lora:ital@0;1&display=swap">
+<style>${style}</style></head>
+<body>
+${appHtml}
+<div class="toast" id="toast"></div>
+<script id="strokes-data" type="application/json">${dataJson.replace(/</g, "\\u003c")}${CLOSE}
+<script id="app-code">${code}${CLOSE}
+</body></html>`;
+}
+$("save").addEventListener("click", async () => {
+  const artifact = await window.claude?.use?.("artifact");
+  const data = payload();
+  draftSave();
+  if (artifact) {
+    const html = buildSource(data);
+    try {
+      sessionStorage.setItem("rostrum-flash", "saved");
+      $("status").textContent = "Saving…";
+      await artifact.publish(html);
+      return; // view reloads on success
+    } catch (err) {
+      sessionStorage.removeItem("rostrum-flash");
+      if (err && err.code === "conflict") return; // shell reloads to winner
+      $("status").textContent = "Couldn’t save to the artifact (" + (err && err.code || "error") +
+        ") — use Export or Copy instead.";
+    }
+  } else {
+    $("status").textContent = "Saving isn’t available in this view — use Export or Copy, then send the file to Claude.";
+  }
+  $("export").hidden = false; $("copy").hidden = false;
+});
+$("export").addEventListener("click", async () => {
+  const downloads = await window.claude?.use?.("downloads");
+  if (!downloads) { toast("Export unavailable here — use Copy JSON"); return; }
+  try {
+    await downloads.save({ filename: "rostrum-strokes.json", data: payload() });
+    toast("Saved file — send it to Claude in chat");
+  } catch (err) { if (err && err.code !== "declined") toast("Export failed: " + (err.code || "error")); }
+});
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(payload()); toast("Copied — paste it to Claude in chat"); }
+  catch (e) { toast("Copy failed — try Export"); }
+});
+
+/* ---------- boot ---------- */
+loadStore();
+sizeCanvas();
+window.addEventListener("resize", sizeCanvas);
+show(0);
+updateProgress();
+if (sessionStorage.getItem("rostrum-flash") === "saved") {
+  sessionStorage.removeItem("rostrum-flash");
+  toast("Saved — Claude can read the takes now", 3500);
+  $("status").textContent = "Saved into the artifact. Tell Claude it’s ready — or keep capturing and save again.";
+}
+</script>
