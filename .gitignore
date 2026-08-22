@@ -1,0 +1,18 @@
+# python
+.venv/
+__pycache__/
+*.pyc
+.env
+
+# rendered outputs & working media
+out/
+renders/
+*.mp4
+*.mov
+*.wav
+*.mp3
+!assets/**
+
+# os / editor
+.DS_Store
+.vscode/

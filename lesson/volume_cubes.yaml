@@ -1,0 +1,89 @@
+# Lesson spec — the canonical, machine-readable source the pipeline consumes.
+# Content transcribed from the MCP guided notes (assets/guided_notes.pdf);
+# every `answer` below carries a `check` expression the verifier asserts
+# before any frame renders. If a check fails, the build fails.
+
+meta:
+  title: Volume with Whole-Number Cubes
+  grade: 6
+  subject: Geometry
+  lesson: 1
+  skill: 1
+  objective: >-
+    Find the volume of a right rectangular prism with whole-number edge
+    lengths by packing it with unit cubes and counting.
+  source: assets/guided_notes.pdf
+  pages: [1, 2]
+
+do_now:
+  - id: dn1
+    prompt: >-
+      Consider an array of 3 rows of 4 squares. How many squares are there
+      in all? Write a multiplication equation to show your thinking.
+    ink:
+      - field: equation
+        write: "3 × 4 = 12"
+        check: "3 * 4 == 12"
+      - field: count
+        write: "12"
+        check: "3 * 4 == 12"
+  - id: dn2
+    prompt: Solve.
+    ink:
+      - { field: fact1, write: "12", check: "3 * 4 == 12" }
+      - { field: fact2, write: "8",  check: "4 * 2 == 8" }
+      - { field: fact3, write: "10", check: "2 * 5 == 10" }
+      - { field: fact4, write: "30", check: "5 * 6 == 30" }
+      - { field: fact5, write: "28", check: "4 * 7 == 28" }
+  - id: dn3
+    prompt: Find the area of a rectangle that is 5 units by 2 units.
+    ink:
+      - field: area
+        write: "10"
+        check: "5 * 2 == 10"
+
+vocabulary:
+  - term: Volume
+    definition: >-
+      The amount of space a solid figure takes up, measured in cubic units.
+    example: >-
+      A box packed with 12 one-inch unit cubes has a volume of 12 cubic units.
+  - term: Unit Cube
+    definition: >-
+      A cube that is 1 unit long, 1 unit wide, and 1 unit tall — the building
+      block used to measure volume.
+    example: >-
+      A cube measuring 1 inch on every side is a unit cube. Many unit cubes
+      packed together fill a larger box.
+
+guided_practice:
+  # Table columns: Cubes per Layer | Number of Layers | Volume (cubic units)
+  # Prism dims below are (length, depth, height) read from the isometric art.
+  - id: gp1
+    dims: [4, 3, 1]
+    ink:
+      - { field: cubes_per_layer, write: "12", check: "4 * 3 == 12" }
+      - { field: num_layers,      write: "1",  check: "1 == 1" }
+      - { field: volume,          write: "12", check: "4 * 3 * 1 == 12" }
+    note: One layer — volume equals the Do Now's area count. The 2D→3D bridge.
+  - id: gp2
+    dims: [4, 1, 3]
+    ink:
+      - { field: cubes_per_layer, write: "4",  check: "4 * 1 == 4" }
+      - { field: num_layers,      write: "3",  check: "3 == 3" }
+      - { field: volume,          write: "12", check: "4 * 1 * 3 == 12" }
+    note: Different shape, same 12 — volume is a count, not an appearance.
+  - id: gp3
+    dims: [4, 3, 2]
+    ink:
+      - { field: cubes_per_layer, write: "12", check: "4 * 3 == 12" }
+      - { field: num_layers,      write: "2",  check: "2 == 2" }
+      - { field: volume,          write: "24", check: "4 * 3 * 2 == 24" }
+    note: Problem 1 with a second layer stacked — volume is area, stacked.
+  - id: gp4
+    dims: [5, 4, 2]
+    ink:
+      - { field: cubes_per_layer, write: "20", check: "5 * 4 == 20" }
+      - { field: num_layers,      write: "2",  check: "2 == 2" }
+      - { field: volume,          write: "40", check: "5 * 4 * 2 == 40" }
+    note: Bigger footprint, same method — generalize with confidence.
