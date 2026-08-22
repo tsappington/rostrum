@@ -49,6 +49,16 @@ def to_px(value: float, dpi: int = 300) -> float:
     return value * dpi / 72.0
 
 
+def render_region(page_index: int, rect_pt: tuple[float, float, float, float],
+                  dpi: float) -> Image.Image:
+    """Render just one page region — the camera never pays for the full page."""
+    with open_doc() as doc:
+        clip = pymupdf.Rect(*rect_pt)
+        pix = doc[page_index].get_pixmap(dpi=int(round(dpi)), clip=clip,
+                                         colorspace=pymupdf.csRGB)
+        return Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+
+
 # The document draws every answer blank the same way: a hairline filled
 # rect (~0.75pt tall) in this exact warm gray. That's our anchor signature.
 _BLANK_FILL = (0.7254902, 0.6901961, 0.6391852)
