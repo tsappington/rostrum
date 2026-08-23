@@ -20,7 +20,7 @@ from rostrum import capture
 from rostrum.render import Rostrum, write_video
 from tools.spike_ink import CAP_PT, ORIGIN, REGION, build as build_synthetic
 
-DATA = "assets/strokes/capture_ted_v1.json"
+DATA = "assets/strokes/capture_ted_v2.json"
 
 
 def build_captured(t0: float = 0.8):
