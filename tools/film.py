@@ -21,7 +21,7 @@ import time
 
 import soundfile as sf
 
-from rostrum import capture
+from rostrum import capture, chip
 from rostrum.page import find_blanks
 from rostrum.render import MovingRostrum, mux, write_video
 from rostrum.timeline import Timeline
@@ -51,10 +51,10 @@ UL_VOLUME = (83.7, 502.5, 49.0)      # x, y, width
 UL_UNITCUBE = (83.7, 649.5, 63.5)
 
 
-def build():
+def build(voice: str = "af_sarah", speed: float = 0.92):
     D = capture.load(DATA)
     lib = capture.Library(D)
-    tl = Timeline(Narrator("af_bella", 0.92))
+    tl = Timeline(Narrator(voice, speed))
     bs = find_blanks(0)
     eq_b, count_b, fact_bs, area_b = bs[2], bs[3], bs[4:9], bs[9]
     keys1: list[tuple[float, float, float]] = [(0.0, X1, Y_OPEN)]
@@ -93,10 +93,12 @@ def build():
            "box, just by counting cubes.", gap=0.5)
 
     # Beat 1 — pause and try
-    tl.say("But first, let's warm up with something you already know. Pause "
-           "the video here, and try the Do Now on your own.", gap=0.3)
-    tl.say("When you're ready, press play, and we'll go through it together.",
-           gap=0.9)
+    s_pause = tl.say("But first, let's warm up with something you already "
+                     "know. Pause the video here, and try the Do Now on "
+                     "your own.", gap=0.3)
+    s_resume = tl.say("When you're ready, press play, and we'll go through "
+                      "it together.", gap=0.9)
+    chips = [(s_pause.token_start("Pause"), s_resume.end + 0.5)]
 
     # Beat 2 — Do Now problem 1
     s = tl.say("Let's check it. Three rows… of four squares.", gap=0.5)
@@ -208,11 +210,12 @@ def build():
     tl.say("Volume is area — stacked.", gap=0.8)
 
     # Beat 9 — row 4, this one's yours
-    s = tl.say("Last one — and this one's yours. Pause here, and try prism "
-               "four.", gap=1.6)
-    cam2(Y_ROW4, at=s.t0 + 0.2)
+    s9 = tl.say("Last one — and this one's yours. Pause here, and try prism "
+                "four.", gap=1.6)
+    cam2(Y_ROW4, at=s9.t0 + 0.2)
     s = tl.say("Ready? Check it with me. Five by four — twenty cubes in a "
                "layer.", gap=0.15)
+    chips.append((s9.token_start("Pause"), s.t0 - 0.15))
     end = cell_ink("n20", 3, "cpl", s.token_start("twenty") - 0.1, "gp4.cpl")
     tl.t = max(tl.t, end) + 0.25
     s = tl.say("Two layers.", gap=0.12)
@@ -237,15 +240,23 @@ def build():
            "See you there.", gap=0.0)
     tl.pause(1.8)
 
-    return tl, keys1, keys2, t_cut, n_ink_a
+    return tl, keys1, keys2, t_cut, n_ink_a, chips
 
 
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "render"
-    tl, keys1, keys2, t_cut, n_ink_a = build()
+    voice = sys.argv[2] if len(sys.argv) > 2 else "af_sarah"
+    speed = float(sys.argv[3]) if len(sys.argv) > 3 else 0.92
+    tl, keys1, keys2, t_cut, n_ink_a, chips = build(voice, speed)
     total = tl.t
     print(f"total {total:.1f}s ({total/60:.1f} min) · cut at {t_cut:.1f}s · "
-          f"{len(tl.segs)} lines · {len(tl.inks)} ink events")
+          f"{len(tl.segs)} lines · {len(tl.inks)} ink events · {voice} @{speed}")
+
+    if mode == "audio":
+        path = f"out/narration_{voice.replace('af_', '').replace('am_', '')}.wav"
+        sf.write(path, tl.mix(), SR)
+        print(path)
+        return
 
     if mode == "schedule":
         for s in sorted(tl.segs, key=lambda x: x.t0):
@@ -272,10 +283,12 @@ def main():
             t = i / fps
             if t < t_cut:
                 cam_a.ink.draw_until(ink_a, t)
-                yield cam_a.frame(t)
+                f = cam_a.frame(t)
             else:
                 cam_b.ink.draw_until(ink_b, t)
-                yield cam_b.frame(t)
+                f = cam_b.frame(t)
+            chip.overlay(f, t, chips)
+            yield f
             if i % 900 == 0:
                 el = time.time() - t_start
                 print(f"  frame {i}/{n}  ({el:.0f}s, "
