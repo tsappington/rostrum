@@ -82,12 +82,17 @@ class MovingRostrum:
                 return x0 + (x1 - x0) * u, y0 + (y1 - y0) * u
         return ks[-1][1], ks[-1][2]
 
-    def frame(self, t: float) -> Image.Image:
+    def frame(self, t: float, under=None) -> Image.Image:
+        """under(comp, box): draws paper-layer light and living figures
+        onto the cropped plate before the ink lands on top."""
         x_pt, y_pt = self.position(t)
         px = int(round((x_pt - self.union[0]) * self.scale))
         py = int(round((y_pt - self.union[1]) * self.scale))
         box = (px, py, px + self._w, py + self._h)
-        comp = Image.alpha_composite(self.plate.crop(box), self.ink.img.crop(box))
+        comp = self.plate.crop(box)
+        if under is not None:
+            under(comp, box)
+        comp = Image.alpha_composite(comp, self.ink.img.crop(box))
         return comp.convert("RGB").resize(self.out_size, Image.LANCZOS)
 
 
