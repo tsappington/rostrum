@@ -51,6 +51,8 @@ button.act.warn { background: var(--card); color: var(--navy); border: 1.5px sol
 button.act:disabled { opacity: .35; }
 button:active { transform: translateY(1px); }
 .takes { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px; min-height: 40px; }
+.preview-card { margin-top: 10px; }
+#pagePreview { display: block; width: 100%; height: 84px; border-radius: 12px; }
 .take-chip { display: flex; align-items: center; gap: 7px; background: var(--card);
   border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px 6px 13px;
   font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
@@ -101,10 +103,16 @@ button:active { transform: translateY(1px); }
 
   <div class="takes" id="takes"></div>
 
+  <div class="card preview-card">
+    <canvas id="pagePreview"></canvas>
+    <div class="stage-hint">your starred take at page scale — this is the truth</div>
+  </div>
+
   <div class="card savebar">
-    <div class="status" id="status">Write each prompt a couple of times, keep the takes
-      you like, star the best one, then save. The extras after the required set are
-      optional insurance.</div>
+    <div class="status" id="status">Round two. Use the Pencil — pen strokes carry
+      pressure, and finger writing is always worse than your real hand. Write at
+      natural speed; the page-scale strip above is the truth, not the big canvas.
+      Star your best takes, then save.</div>
     <button class="act" id="export" hidden>Export file</button>
     <button class="act warn" id="copy" hidden>Copy JSON</button>
     <button class="act primary" id="save">Save to Claude</button>
@@ -155,15 +163,21 @@ let take = null;             // in-progress take {t0, strokes:[{points:[[x,y,t,p
 let liveStroke = null;
 let replaying = false;
 
-/* ---------- persistence: embedded data block, localStorage draft ---------- */
+/* ---------- persistence: embedded data block, localStorage draft ----------
+   EPOCH gates every source: bumping it retires all older captures (embedded
+   and localStorage alike) so a reset can never be resurrected by a draft. */
+const EPOCH = 2;
 function loadStore() {
   let embedded = {};
   try { embedded = JSON.parse($("strokes-data").textContent || "{}"); } catch (e) {}
   let draft = null;
   try { draft = JSON.parse(localStorage.getItem("rostrum-capture") || "null"); } catch (e) {}
-  const newer = (a, b) => (a?.savedAt || 0) >= (b?.savedAt || 0) ? a : b;
-  const picked = draft && embedded.prompts ? newer(draft, embedded) : (draft || embedded);
-  if (picked && picked.prompts) store = picked;
+  const valid = (s) => s && s.prompts && s.epoch === EPOCH;
+  const cands = [embedded, draft].filter(valid);
+  if (cands.length) {
+    store = cands.reduce((a, b) => ((a.savedAt || 0) >= (b.savedAt || 0) ? a : b));
+  }
+  store.epoch = EPOCH;
 }
 function draftSave() {
   store.savedAt = Date.now();
@@ -193,23 +207,42 @@ function guides() {
   }
   ctx.restore();
 }
-function drawStroke(s, upto) {
-  const pts = upto == null ? s.points : s.points.slice(0, upto);
-  if (pts.length < 1) return;
-  ctx.save();
-  ctx.strokeStyle = "#2D5FA8"; ctx.lineCap = "round"; ctx.lineJoin = "round";
-  for (let i = 1; i < pts.length; i++) {
-    const p = pts[i][3] || 0.5;
-    ctx.lineWidth = 2.1 * (0.55 + 0.9 * p);
-    ctx.beginPath(); ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
-    ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke();
+function strokePressures(pts) {
+  /* Real Pencil pressure when present; otherwise the pipeline's estimate —
+     slow ink presses harder — so the preview stops lying about the ink. */
+  const hasP = pts.some((q) => Math.abs((q[3] ?? 0.5) - 0.5) > 0.02);
+  const out = new Array(pts.length);
+  for (let i = 0; i < pts.length; i++) {
+    if (hasP) { out[i] = pts[i][3]; continue; }
+    if (i === 0) { out[i] = 0.7; continue; }
+    const dt = Math.max(pts[i][2] - pts[i - 1][2], 1);
+    const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    out[i] = Math.max(0.42, Math.min(0.92, 0.78 - 0.3 * Math.min(d / dt / 1.1, 1)));
   }
-  if (pts.length === 1) {
-    ctx.fillStyle = "#2D5FA8";
-    ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1], 1.2, 0, 7); ctx.fill();
-  }
-  ctx.restore();
+  return out;
 }
+function drawStrokeOn(g, pts, upto, base, tf) {
+  const n = upto == null ? pts.length : upto;
+  if (n < 1) return;
+  const P = strokePressures(pts);
+  g.save();
+  g.strokeStyle = "#2D5FA8"; g.fillStyle = "#2D5FA8";
+  g.lineCap = "round"; g.lineJoin = "round";
+  if (n === 1) {
+    const [x, y] = tf(pts[0]);
+    g.beginPath(); g.arc(x, y, base * 0.55, 0, 7); g.fill();
+  }
+  for (let i = 1; i < n; i++) {
+    const p = (P[i - 1] + P[i]) / 2;
+    g.lineWidth = base * (0.55 + 0.9 * p);
+    const [x0, y0] = tf(pts[i - 1]);
+    const [x1, y1] = tf(pts[i]);
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+  }
+  g.restore();
+}
+const IDENT = (q) => [q[0], q[1]];
+function drawStroke(s, upto) { drawStrokeOn(ctx, s.points, upto, 3.4, IDENT); }
 function redraw() {
   ctx.clearRect(0, 0, store.guide.w, store.guide.h);
   guides();
@@ -227,7 +260,7 @@ stage.addEventListener("pointerdown", (e) => {
   e.preventDefault();
   stage.setPointerCapture(e.pointerId);
   if (!take) take = { t0: e.timeStamp, strokes: [] };
-  liveStroke = { points: [] };
+  liveStroke = { points: [], ptype: e.pointerType };
   addPoint(e);
   $("rec").classList.add("on");
 });
@@ -265,7 +298,8 @@ function keepTake() {
   const ps = promptStore();
   const dur = take.strokes.at(-1).points.at(-1)[2];
   ps.takes.forEach((t) => (t.starred = false));
-  ps.takes.push({ at: Date.now(), duration: dur, starred: true, strokes: take.strokes });
+  ps.takes.push({ at: Date.now(), duration: dur, starred: true,
+                  guide: { ...store.guide }, strokes: take.strokes });
   take = null; draftSave(); redraw(); renderTakes(); syncButtons();
   toast(`Kept — take ${ps.takes.length} of “${PROMPTS[cur].d}”`);
 }
@@ -288,6 +322,33 @@ function renderTakes() {
     el.appendChild(chip);
   });
   updateProgress();
+  renderPreview();
+}
+
+/* ---------- page-scale preview: the fair trial, live ---------- */
+const pv = $("pagePreview"), pvg = pv.getContext("2d");
+function renderPreview() {
+  const dpr = window.devicePixelRatio || 1;
+  const r = pv.getBoundingClientRect();
+  pv.width = Math.round(r.width * dpr);
+  pv.height = Math.round(r.height * dpr);
+  pvg.setTransform(dpr, 0, 0, dpr, 0, 0);
+  pvg.clearRect(0, 0, r.width, r.height);
+  const baseY = r.height * 0.68;
+  pvg.strokeStyle = "#DAD3C6"; pvg.lineWidth = 1;
+  pvg.beginPath(); pvg.moveTo(16, baseY); pvg.lineTo(r.width - 16, baseY); pvg.stroke();
+  const ps = store.prompts[PROMPTS[cur].id];
+  const t = ps && (ps.takes.find((x) => x.starred) || ps.takes.at(-1));
+  if (!t) return;
+  const g = t.guide || store.guide;
+  const capPx = g.baseline - g.cap;
+  const sc = (r.height * 0.42) / capPx;          // take cap -> preview cap
+  let minX = Infinity;
+  for (const s of t.strokes) for (const q of s.points) minX = Math.min(minX, q[0]);
+  const tf = (q) => [24 + (q[0] - minX) * sc,
+                     baseY + (q[1] - g.baseline) * sc];
+  const base = r.height * 0.42 * 0.136;          // pipeline: 1.9pt pen / 14pt cap
+  for (const s of t.strokes) drawStrokeOn(pvg, s.points, null, base, tf);
 }
 function replay(t) {
   if (replaying) return;
@@ -405,7 +466,7 @@ $("copy").addEventListener("click", async () => {
 /* ---------- boot ---------- */
 loadStore();
 sizeCanvas();
-window.addEventListener("resize", sizeCanvas);
+window.addEventListener("resize", () => { sizeCanvas(); renderPreview(); });
 show(0);
 updateProgress();
 if (sessionStorage.getItem("rostrum-flash") === "saved") {

@@ -55,10 +55,10 @@ def to_timed(
     origin_pt: page (x, y) where the take's left edge meets the baseline.
     pace > 1 slows the performance down; timing is otherwise verbatim.
     """
-    guide = data["guide"]
+    take = starred_take(data, prompt_id)
+    guide = take.get("guide") or data["guide"]     # v2 takes carry their own
     cap_px = guide["baseline"] - guide["cap"]
     scale = cap_pt / cap_px
-    take = starred_take(data, prompt_id)
 
     x_min = min(p[0] for s in take["strokes"] for p in s["points"])
     t_min = min(p[2] for s in take["strokes"] for p in s["points"])
@@ -93,8 +93,8 @@ def to_timed(
 
 
 def take_width_pt(data: dict, prompt_id: str, cap_pt: float) -> float:
-    guide = data["guide"]
-    scale = cap_pt / (guide["baseline"] - guide["cap"])
     take = starred_take(data, prompt_id)
+    guide = take.get("guide") or data["guide"]
+    scale = cap_pt / (guide["baseline"] - guide["cap"])
     xs = [p[0] for s in take["strokes"] for p in s["points"]]
     return (max(xs) - min(xs)) * scale
