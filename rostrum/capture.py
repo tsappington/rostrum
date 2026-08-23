@@ -49,11 +49,14 @@ def to_timed(
     t0: float = 0.0,
     pace: float = 1.0,
     smooth_passes: int = 1,
+    max_gap: float = 0.9,
 ) -> list[list[TimedPoint]]:
     """Place one captured take on the page as renderer-ready timed points.
 
     origin_pt: page (x, y) where the take's left edge meets the baseline.
-    pace > 1 slows the performance down; timing is otherwise verbatim.
+    pace > 1 slows the performance down; timing is otherwise verbatim,
+    except pen-up pauses longer than max_gap seconds are clamped to it —
+    a capture interruption should not replay as a frozen video.
     """
     take = starred_take(data, prompt_id)
     guide = take.get("guide") or data["guide"]     # v2 takes carry their own
@@ -64,11 +67,18 @@ def to_timed(
     t_min = min(p[2] for s in take["strokes"] for p in s["points"])
 
     out: list[list[TimedPoint]] = []
+    t_shift = 0.0
+    prev_end: float | None = None
     for s in take["strokes"]:
         pts = np.array(s["points"], dtype=float)          # x, y, t_ms, p
         xs = _smooth(pts[:, 0], smooth_passes)
         ys = _smooth(pts[:, 1], smooth_passes)
-        ts = (pts[:, 2] - t_min) / 1000.0 * pace + t0
+        ts = (pts[:, 2] - t_min) / 1000.0 * pace + t0 - t_shift
+        if prev_end is not None and ts[0] - prev_end > max_gap:
+            extra = ts[0] - prev_end - max_gap
+            t_shift += extra
+            ts = ts - extra
+        prev_end = ts[-1]
 
         # pressure from real speed: slow ink presses harder
         if len(pts) > 1:

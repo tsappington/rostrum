@@ -12,10 +12,17 @@
   --good: #4C8A5C;
 }
 html { -webkit-text-size-adjust: 100%; }
+/* A drawing surface, not a document: nothing here is selectable text, so
+   iPadOS double-tap selection and Scribble's select-by-pencil-drag have
+   nothing to grab. Copying data goes through the Copy JSON button. */
+html, body {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
 body {
   background: var(--paper); color: var(--navy);
   font-family: "Barlow Semi Condensed", "Avenir Next Condensed", sans-serif;
-  min-height: 100vh; overscroll-behavior: none;
+  min-height: 100vh; overscroll-behavior: none; touch-action: manipulation;
 }
 #app { max-width: 900px; margin: 0 auto; padding: 14px 16px 40px; }
 header { display: flex; align-items: baseline; gap: 12px; padding: 4px 2px 12px; }
@@ -255,9 +262,16 @@ function pointerOK(e) {
   if (e.pointerType === "pen" || e.pointerType === "mouse") return true;
   return $("allowTouch").checked;
 }
+// Pointer preventDefault alone doesn't silence Safari's system gestures;
+// the raw touch events must be cancelled too (non-passive), and any text
+// selection the OS already made gets cleared before ink goes down.
+for (const ev of ["touchstart", "touchmove", "touchend"]) {
+  stage.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+}
 stage.addEventListener("pointerdown", (e) => {
   if (replaying || !pointerOK(e)) return;
   e.preventDefault();
+  try { const sel = window.getSelection(); if (sel) sel.removeAllRanges(); } catch (x) {}
   stage.setPointerCapture(e.pointerId);
   if (!take) take = { t0: e.timeStamp, strokes: [] };
   liveStroke = { points: [], ptype: e.pointerType };
