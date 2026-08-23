@@ -116,6 +116,16 @@ class InkLayer:
         si, pi = self._cursor
         while si < len(timed):
             stroke = timed[si]
+            if len(stroke) == 1:                      # a dot — the pen taps
+                if stroke[0].t > t:
+                    break
+                q = self._xy(stroke[0])
+                r = self.width_px * (0.55 + 0.90 * stroke[0].p) * 0.5
+                alpha = int(176 + 72 * stroke[0].p)
+                self.draw.ellipse([q[0] - r, q[1] - r, q[0] + r, q[1] + r],
+                                  fill=(*INK_RGB, alpha))
+                si, pi = si + 1, 1
+                continue
             while pi < len(stroke) and stroke[pi].t <= t:
                 a, b = stroke[pi - 1], stroke[pi]
                 pa, pb = self._xy(a), self._xy(b)
