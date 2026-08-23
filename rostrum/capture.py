@@ -109,11 +109,10 @@ def _fit(take: dict, data: dict, cap_pt: float) -> tuple[float, float]:
     top = np.percentile(ys, 4)
     base_y = np.percentile(ys, 94)
     cap_px = base_y - top
-    if cap_px < 8.0:                     # a mark (underline, dot): no cap of
-        guide = take.get("guide") or data["guide"]   # its own — use the guide
-        cap_px = guide["baseline"] - guide["cap"]
-        base_y = guide["baseline"]
-    return cap_pt / cap_px, float(base_y)
+    if cap_px < 8.0:                     # a flat mark (underline, dot) has no
+        guide = take.get("guide") or data["guide"]   # cap of its own: borrow
+        cap_px = guide["baseline"] - guide["cap"]    # the guide's SCALE only —
+    return cap_pt / cap_px, float(base_y)            # position stays the ink's
 
 
 def _smooth(a: np.ndarray, passes: int = 1) -> np.ndarray:
@@ -191,7 +190,9 @@ def to_timed(
         scale *= 1 + rng.normal(0, 0.02)
         rot = math.radians(rng.normal(0, 0.7))
         pace *= 1 + rng.normal(0, 0.05)
-        base_j = rng.normal(0, 0.012) * cap_pt
+        # clamped absolutely: width-fit marks carry a fabricated cap, and
+        # baseline wander must stay hair's-width regardless of that scale
+        base_j = float(np.clip(rng.normal(0, 0.012) * cap_pt, -0.6, 0.6))
         p_gain = 1 + rng.normal(0, 0.05)
     cos_r, sin_r = math.cos(rot), math.sin(rot)
 

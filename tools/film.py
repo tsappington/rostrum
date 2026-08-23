@@ -47,8 +47,8 @@ ROW_BASE = [230.75, 356.85, 482.95, 609.05]             # writing baselines
 CELL_CAP = 13.0
 
 # vocabulary term underlines (from text search rects)
-UL_VOLUME = (83.7, 499.0, 49.0)      # x, y, width
-UL_UNITCUBE = (83.7, 644.5, 63.5)
+UL_VOLUME = (83.7, 502.5, 49.0)      # x, y, width
+UL_UNITCUBE = (83.7, 649.5, 63.5)
 
 
 def build():
