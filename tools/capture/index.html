@@ -116,10 +116,11 @@ button:active { transform: translateY(1px); }
   </div>
 
   <div class="card savebar">
-    <div class="status" id="status">Round two. Use the Pencil — pen strokes carry
-      pressure, and finger writing is always worse than your real hand. Write at
-      natural speed; the page-scale strip above is the truth, not the big canvas.
-      Star your best takes, then save.</div>
+    <div class="status" id="status">The library round: five takes of each required
+      prompt — your earlier takes already count. Write quick and natural; small
+      differences between takes are the point, they're what makes the rendered
+      hand read as human. Two or three takes are plenty for the extras. Save
+      whenever — saving again just adds to the library.</div>
     <button class="act" id="export" hidden>Export file</button>
     <button class="act warn" id="copy" hidden>Copy JSON</button>
     <button class="act primary" id="save">Save to Claude</button>
@@ -160,6 +161,7 @@ const PROMPTS = [
   { id: "mDot", d: "•", hint: "extra: a counting tap", req: 0 },
   { id: "mCheck", d: "✓", hint: "extra: a small check mark", req: 0 },
 ];
+const TARGET = 5;   // takes per required prompt — the variant library depth
 
 /* ---------- state ---------- */
 const $ = (id) => document.getElementById(id);
@@ -314,7 +316,8 @@ function keepTake() {
   ps.takes.forEach((t) => (t.starred = false));
   ps.takes.push({ at: Date.now(), duration: dur, starred: true,
                   guide: { ...store.guide }, strokes: take.strokes });
-  take = null; draftSave(); redraw(); renderTakes(); syncButtons();
+  take = null; draftSave();
+  show(cur);
   toast(`Kept — take ${ps.takes.length} of “${PROMPTS[cur].d}”`);
 }
 function renderTakes() {
@@ -388,8 +391,9 @@ function replay(t) {
 function show(i) {
   cur = Math.max(0, Math.min(PROMPTS.length - 1, i));
   const p = PROMPTS[cur];
+  const k = store.prompts[p.id]?.takes.length || 0;
   $("prompt").innerHTML = `${p.req ? "" : `<span class="optional-tag">extra</span> `}${p.d}
-    <small>${p.hint}</small>`;
+    <small>${p.hint} · takes ${k}/${p.req ? TARGET : 2}</small>`;
   $("prev").disabled = cur === 0;
   $("next").disabled = cur === PROMPTS.length - 1;
   take = null; liveStroke = null;
@@ -397,9 +401,10 @@ function show(i) {
 }
 function updateProgress() {
   const req = PROMPTS.filter((p) => p.req);
-  const done = req.filter((p) => store.prompts[p.id]?.takes.length).length;
-  const extras = PROMPTS.filter((p) => !p.req && store.prompts[p.id]?.takes.length).length;
-  $("progress").textContent = `${done}/${req.length} required · ${extras} extras`;
+  const done = req.filter((p) => (store.prompts[p.id]?.takes.length || 0) >= TARGET).length;
+  let total = 0;
+  for (const p of Object.values(store.prompts)) total += p.takes.length;
+  $("progress").textContent = `${done}/${req.length} at ${TARGET} takes · ${total} total`;
 }
 function syncButtons() {
   const drawing = take && take.strokes.length;

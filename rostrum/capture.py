@@ -12,6 +12,7 @@ harder — which preserves the human dynamics we actually captured.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +30,55 @@ def starred_take(data: dict, prompt_id: str) -> dict:
         if t.get("starred"):
             return t
     return takes[-1]
+
+
+class Library:
+    """Round-robin take selection plus per-instance micro-humanization.
+
+    A number that appears six times must never appear the same way twice
+    — the viewer's repetition detector is sharp even when attention
+    isn't. Two defenses, layered: each ink event draws a different
+    captured take of its glyph (selection is a hash of the event key, so
+    renders are reproducible; adjacent repeats of the same take are
+    skipped when the library allows), and every instance is additionally
+    micro-humanized — hair's-width jitters of scale, rotation, baseline,
+    pace, and pressure, seeded by the same hash. With one take on file
+    the second layer still guarantees variation; with five it reads as a
+    hand, not a stamp.
+    """
+
+    def __init__(self, data: dict):
+        self.data = data
+        self._last: dict[str, int] = {}
+        self._memo: dict[tuple[str, str], tuple[dict, int]] = {}
+
+    def pick(self, prompt_id: str, event_key: str) -> tuple[dict, int]:
+        key = (prompt_id, event_key)
+        if key in self._memo:
+            return self._memo[key]
+        import hashlib
+        h = int.from_bytes(
+            hashlib.sha256(f"{prompt_id}|{event_key}".encode()).digest()[:8], "big"
+        )
+        takes = self.data["prompts"][prompt_id]["takes"]
+        idx = h % len(takes)
+        if len(takes) > 1 and self._last.get(prompt_id) == idx:
+            idx = (idx + 1) % len(takes)
+        self._last[prompt_id] = idx
+        self._memo[key] = (takes[idx], h)
+        return self._memo[key]
+
+    def width_pt(self, prompt_id: str, cap_pt: float, event_key: str) -> float:
+        take, _ = self.pick(prompt_id, event_key)
+        scale, _base = _fit(take, self.data, cap_pt)
+        xs = [p[0] for s in take["strokes"] for p in s["points"]]
+        return (max(xs) - min(xs)) * scale
+
+    def timed(self, prompt_id: str, origin_pt: tuple[float, float], cap_pt: float,
+              t0: float, event_key: str, **kw) -> list[list[TimedPoint]]:
+        take, h = self.pick(prompt_id, event_key)
+        return to_timed(self.data, prompt_id, origin_pt, cap_pt, t0=t0,
+                        take=take, variant_seed=h, **kw)
 
 
 def _fit(take: dict, data: dict, cap_pt: float) -> tuple[float, float]:
@@ -101,6 +151,8 @@ def to_timed(
     pace: float = 1.0,
     smooth_passes: int = 1,
     max_gap: float = 0.9,
+    take: dict | None = None,
+    variant_seed: int | None = None,
 ) -> list[list[TimedPoint]]:
     """Place one captured take on the page as renderer-ready timed points.
 
@@ -108,11 +160,33 @@ def to_timed(
     pace > 1 slows the performance down; timing is otherwise verbatim,
     except pen-up pauses longer than max_gap seconds are clamped to it —
     a capture interruption should not replay as a frozen video.
+
+    variant_seed switches on micro-humanization: hair's-width seeded
+    jitters of scale, rotation, baseline, pace, and pressure, so two
+    renders of the same take are similar but never identical.
     """
-    take = starred_take(data, prompt_id)
+    take = take if take is not None else starred_take(data, prompt_id)
     scale, base_y = _fit(take, data, cap_pt)
 
-    x_min = min(p[0] for s in take["strokes"] for p in s["points"])
+    rot = 0.0
+    base_j = 0.0
+    p_gain = 1.0
+    if variant_seed is not None:
+        rng = np.random.default_rng(variant_seed)
+        scale *= 1 + rng.normal(0, 0.02)
+        rot = math.radians(rng.normal(0, 0.7))
+        pace *= 1 + rng.normal(0, 0.05)
+        base_j = rng.normal(0, 0.012) * cap_pt
+        p_gain = 1 + rng.normal(0, 0.05)
+    cos_r, sin_r = math.cos(rot), math.sin(rot)
+
+    all_xy = np.array([[p[0], p[1]] for s in take["strokes"] for p in s["points"]])
+    cx, cy = all_xy.mean(axis=0)
+    if rot:
+        rx = cx + (all_xy[:, 0] - cx) * cos_r - (all_xy[:, 1] - cy) * sin_r
+        x_min = float(rx.min())
+    else:
+        x_min = float(all_xy[:, 0].min())
     t_min = min(p[2] for s in take["strokes"] for p in s["points"])
 
     out: list[list[TimedPoint]] = []
@@ -122,6 +196,9 @@ def to_timed(
         pts = _dedup(np.array(s["points"], dtype=float))  # x, y, t_ms, p
         xs = _smooth(pts[:, 0], smooth_passes)
         ys = _smooth(pts[:, 1], smooth_passes)
+        if rot:
+            xs, ys = (cx + (xs - cx) * cos_r - (ys - cy) * sin_r,
+                      cy + (xs - cx) * sin_r + (ys - cy) * cos_r)
         ts = (pts[:, 2] - t_min) / 1000.0 * pace + t0 - t_shift
         if prev_end is not None and ts[0] - prev_end > max_gap:
             extra = ts[0] - prev_end - max_gap
@@ -150,8 +227,10 @@ def to_timed(
             p[:head] *= np.linspace(0.75, 1.0, head)
             p[-tail:] *= np.linspace(1.0, 0.72, tail)
 
+        if p_gain != 1.0:
+            p = np.clip(p * p_gain, 0.30, 0.95)
         page_x = origin_pt[0] + (xs - x_min) * scale
-        page_y = origin_pt[1] + (ys - base_y) * scale
+        page_y = origin_pt[1] + (ys - base_y) * scale + base_j
         out.append([TimedPoint(ts[j], page_x[j], page_y[j], p[j]) for j in range(n)])
     return out
 
