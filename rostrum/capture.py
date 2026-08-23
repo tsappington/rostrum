@@ -52,6 +52,21 @@ class Library:
         self._last: dict[str, int] = {}
         self._memo: dict[tuple[str, str], tuple[dict, int]] = {}
 
+    def _usable(self, prompt_id: str) -> list[dict]:
+        """Takes eligible for selection: interruption outliers excluded.
+
+        A take whose duration is far beyond the prompt's median was
+        stalled mid-capture (a pen-down hold survives even the replay
+        gap clamp). With ten takes on file we can afford to be choosy.
+        """
+        takes = self.data["prompts"][prompt_id]["takes"]
+        if len(takes) < 3:
+            return takes
+        durs = sorted(t["duration"] for t in takes)
+        med = durs[len(durs) // 2]
+        good = [t for t in takes if t["duration"] <= 3 * med]
+        return good or takes
+
     def pick(self, prompt_id: str, event_key: str) -> tuple[dict, int]:
         key = (prompt_id, event_key)
         if key in self._memo:
@@ -60,7 +75,7 @@ class Library:
         h = int.from_bytes(
             hashlib.sha256(f"{prompt_id}|{event_key}".encode()).digest()[:8], "big"
         )
-        takes = self.data["prompts"][prompt_id]["takes"]
+        takes = self._usable(prompt_id)
         idx = h % len(takes)
         if len(takes) > 1 and self._last.get(prompt_id) == idx:
             idx = (idx + 1) % len(takes)
