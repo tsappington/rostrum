@@ -75,10 +75,16 @@ class GlowTrack:
             if a <= 0.01:
                 continue
             color = _hex(g.color)
-            pts = [((x - union[0]) * scale - box[0],
-                    (y - union[1]) * scale - box[1]) for x, y in g.shape]
-            xs = [p[0] for p in pts]
-            ys = [p[1] for p in pts]
+            # a shape is one polygon (list of points) or many (list of
+            # polygons — e.g. every face of one layer of cubes); many are
+            # drawn into one layer so the wash composites exactly once
+            groups = (g.shape if isinstance(g.shape[0][0], (tuple, list))
+                      else [g.shape])
+            mapped = [[((x - union[0]) * scale - box[0],
+                        (y - union[1]) * scale - box[1]) for x, y in gp]
+                      for gp in groups]
+            xs = [p[0] for gp in mapped for p in gp]
+            ys = [p[1] for gp in mapped for p in gp]
             if max(xs) < 0 or min(xs) > comp.width or \
                max(ys) < 0 or min(ys) > comp.height:
                 continue
@@ -87,10 +93,12 @@ class GlowTrack:
             layer = Image.new("RGBA", (x1 - x0, y1 - y0), (0, 0, 0, 0))
             d = ImageDraw.Draw(layer)
             fill = (*color, int(g.max_alpha * a))
-            local = [(p[0] - x0, p[1] - y0) for p in pts]
-            if g.radius > 0 and len(pts) == 2:
+            if g.radius > 0 and len(groups) == 1 and len(mapped[0]) == 2:
+                local = [(p[0] - x0, p[1] - y0) for p in mapped[0]]
                 d.rounded_rectangle([*local[0], *local[1]],
                                     radius=g.radius * scale, fill=fill)
             else:
-                d.polygon(local, fill=fill)
+                for gp in mapped:
+                    d.polygon([(p[0] - x0, p[1] - y0) for p in gp],
+                              fill=fill)
             comp.alpha_composite(layer, (x0, y0))

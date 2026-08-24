@@ -73,13 +73,17 @@ def _row_y(g, i):
     return g[1] + g[2] * (i + 0.5)
 
 
-def _p2_layer_band(i):
-    """Prism 2's i-th layer (bottom-up) as a wash band over the art.
-    Bands abut exactly — vertical padding would double the wash where
-    neighbours meet and stripe the count."""
-    h = (P2_ART[3] - P2_ART[1]) / 3.0
-    return rect(P2_ART[0] - 3.0, P2_ART[3] - h * (i + 1),
-                P2_ART[2] + 3.0, P2_ART[3] - h * i)
+def _p2_layers():
+    """Prism 2's three layers as the art's own face polygons (bottom-up).
+    A rectangular band overhangs a leaning isometric prism; lighting the
+    faces themselves colors the cubes and nothing else."""
+    fig = Figure.extract(1, (120.0, 303.0, 200.0, 400.0))
+    tops = [min(sum(y for _, y in f.verts) / len(f.verts) for f in cube)
+            for cube in fig.cubes]
+    order = sorted(range(len(fig.cubes)), key=lambda i: -tops[i])
+    per = len(fig.cubes) // 3
+    return [[f.verts for i in order[k * per:(k + 1) * per]
+             for f in fig.cubes[i]] for k in range(3)]
 
 
 def _grid_rows(g):
@@ -94,7 +98,7 @@ def _grid_cols(g):
             for k in range(cols)]
 
 
-def build(voice: str = "af_sarah", speed: float = 0.92):
+def build(voice: str = "af_sarah", speed: float = 0.88):
     D = capture.load(DATA)
     lib = capture.Library(D)
     tl = Timeline(Narrator(voice, speed))
@@ -191,12 +195,23 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
                           for i in range(3)],
                       t_in=counts[0] - 0.4, t_out=counts[2] + 0.9,
                       flourish=[counts[2] + 0.12]))
-    s = tl.say("And in each row: four squares.", gap=0.4)
-    # rows finish, a breath, then the columns — never overlapping
-    cols_t0 = max(s.token_start("four"), row_hold + 0.45)
-    cols_end = glow1.sweep(_grid_cols(DN1), cols_t0, step=0.3, hold=0.6,
-                           radius=2)
-    tl.t = max(tl.t, cols_end + 0.35)
+    # …and the columns get the same treatment: count, light, hop
+    s = tl.say("And how many squares in each row? Count with me:", gap=0.0)
+    cols = _grid_cols(DN1)
+    col_counts = count_along(s.end, words=("One,", "Two,", "Three,", "Four."),
+                             cad=1.15, lead_gap=0.45)
+    s = tl.say("Four in each row.", at=col_counts[3] + 1.05, gap=0.4)
+    col_hold = s.end + 0.5
+    for t_c, shape in zip(col_counts, cols):
+        glow1.add(shape, t_c, col_hold, radius=2)
+    for tb in (col_counts[3] + 0.15, col_counts[3] + 0.55):
+        glow1.add(cols[3], tb, tb + 0.2, fade_in=0.1, fade_out=0.12,
+                  max_alpha=70, radius=2)
+    wands.append(Wand(0, [(col_counts[k], DN1[0] + DN1[2] * (k + 0.5),
+                           DN1[1] - 7.0) for k in range(4)],
+                      t_in=col_counts[0] - 0.4, t_out=col_counts[3] + 0.9,
+                      flourish=[col_counts[3] + 0.12]))
+    tl.t = max(tl.t, col_hold - 0.15)
     s = tl.say("Now, I could count every square, one by one — or I can "
                "multiply: three rows of four.", gap=0.3)
     g = DN1
@@ -316,8 +331,8 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
     lc = count_along(s.end, cad=1.35, lead_gap=0.45)
     tl.t = max(tl.t, lc[2] + 1.0)
     layer_hold = lc[2] + 1.0
-    for t_c, i in zip(lc, range(3)):
-        glow2.add(_p2_layer_band(i), t_c, layer_hold, radius=3, max_alpha=60)
+    for t_c, shape in zip(lc, _p2_layers()):
+        glow2.add(shape, t_c, layer_hold, max_alpha=55)
     wands.append(Wand(1, [(lc[i], WAND_P2_X,
                            P2_ART[3] - (P2_ART[3] - P2_ART[1]) / 3.0
                            * (i + 0.5)) for i in range(3)],
@@ -402,10 +417,10 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "render"
     if mode == "clip":
-        voice, speed = "af_sarah", 0.92
+        voice, speed = "af_sarah", 0.88
     else:
         voice = sys.argv[2] if len(sys.argv) > 2 else "af_sarah"
-        speed = float(sys.argv[3]) if len(sys.argv) > 3 else 0.92
+        speed = float(sys.argv[3]) if len(sys.argv) > 3 else 0.88
     f = build(voice, speed)
     tl, t_cut = f.tl, f.t_cut
     total = tl.t
@@ -451,7 +466,7 @@ def main():
               "C": f.marks["C_end"]}[which]
         name = f"out/preview_{which}"
     else:
-        t0, t1, name = 0.0, total, "out/volume_cubes_v2"
+        t0, t1, name = 0.0, total, "out/volume_cubes_v3"
 
     i0, i1 = int(t0 * fps), int(t1 * fps)
     cam_a.ink.draw_until(ink_a, t0)          # fast-forward to the window
