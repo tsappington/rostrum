@@ -27,14 +27,26 @@ times: **volume is a count, not an appearance — area, stacked.**
   between problems; the camera settles and holds still whenever the pen
   is down. Movement between beats, stillness during writing.
 - **Ink:** one voice of blue (`#2D5FA8`) over the printed navy world.
-  Answers on blanks; light annotation marks (counting pulses on the cube
-  art, an underline landing with a spoken emphasis) — always on the
-  page's own artwork, never floating chrome.
-- **Supplementary animation:** exactly one, at Practice 3, where the
-  concept is inherently 3-D — a second layer of unit cubes stacking onto
-  the first, drawn in the worksheet's own isometric style and palette.
-  Policy: the pipeline supports scene-declared supplementals; this video
-  needs one.
+  Answers on blanks; light annotation marks — always on the page's own
+  artwork, never floating chrome.
+- **Light:** the highlight wash is the ink's own blue — the teacher's
+  attention in the teacher's color, and legible where a warm wash
+  disappears into warm paper. It sweeps rows as she counts (cumulative:
+  three lit rows *are* "three rows"), warms the active fact box, lifts
+  labels and terms, and picks out the unit cube's faces on
+  "long / wide / tall". Orange belongs to the glass alone.
+- **Figures (arrival-only):** the illustration panels are the one place
+  the page comes alive, and their grammar is a single verb — *arrive*.
+  The vocabulary box starts blank and cubes pack it as she says
+  "packed"; Prism 3 sits as prism one until its second layer descends
+  on "stacked". Nothing on the page ever fades out — disappearance
+  means nothing in this lesson, while packing and stacking are the
+  lesson. Drawn cubes are pixel-registered to the print, so a finished
+  figure retires with no transition at all.
+- **The glass:** two citizens, both gesture, both orange. The pause
+  chip ("you act now") and the wand ("look here") — a dot that pops in,
+  hops with each spoken count, double-pulses on the last one like a
+  visual period, and pops out. It exists only while counting.
 - **Sound:** a single close-mic teacher voice (Kokoro-82M, open weights,
   word-timestamped). Room-tone silence between beats — the pauses are
   part of the instruction. No music.
@@ -61,7 +73,13 @@ times: **volume is a count, not an appearance — area, stacked.**
 | 9 | Practice 4 — "this one's yours" | row 4 | 0:25 | 4:05 |
 | 10 | Close — the formula in one breath | pull back, full page 2 | 0:12 | 4:17 |
 
-## Script v0
+## Script v0 (historical)
+
+The shooting script now lives in `tools/film.py` (v3: one vocabulary
+spine — squares → cubes → prism; metronome-placed count-alongs; carrier
+words on answers; connective reasoning modeled on the strongest
+exemplar screencast). `python -m tools.film schedule` prints it with
+live timings. v0 below is kept as the record of the first draft.
 
 All numbers below are verified by `lesson/volume_cubes.yaml` checks.
 `[INK: …]` marks writing; `[MARK: …]` marks annotation on the page art.
@@ -131,14 +149,11 @@ when we *can't* see every cube. See you there."
   risks the uncanny where an absent one is neutral; the pipeline tracks
   nib position continuously, so a hand or pen layer remains a rendering
   flag, not a redesign.
-- **Floating pen nib** — parked as a flag-gated A/B once captured
-  strokes land.
+- **Floating pen nib** — superseded by the **wand** (shipped): a
+  glass-layer pointer for counting moments only, per the reference
+  screencast's pen-nib pointer. A nib that rides the ink full-time
+  remains a rendering flag if MCP wants it.
 - **Music bed** — rejected: silence is where a 6th grader thinks.
-- **Ink color A/B** (pen blue vs. page navy) — pending picture lock.
-
-## Open with Ted
-
-- Voice casting (five candidates delivered).
-- Captured vs. synthetic strokes (capture tool live; synthetic proven).
-- Whether Beat 1's pause prompt gets a small typeset "⏸ pause & try"
-  chip in Barlow, or stays voice-only.
+- **Fade transitions on figures** — tried (v2), rejected in screening:
+  a viewer reads fade-out as "what just happened?"; replaced by the
+  arrival-only grammar above.

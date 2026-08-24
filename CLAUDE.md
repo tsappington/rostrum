@@ -51,8 +51,14 @@ lines.
   must exist in the lesson spec with a passing `check`. If a check
   fails, the build must fail.
 - **Two layers only.** The paper (worksheet + ink) and the glass
-  (captions, pause chip). Nothing else ever goes on the glass; nothing
-  synthetic goes on the paper except ink and the page's own idioms.
+  (captions, pause chip, wand). Nothing else ever goes on the glass;
+  nothing synthetic goes on the paper except ink and the page's own
+  idioms. Glass citizens are gesture, not content — they never write
+  or teach. Page light is ink-blue; orange belongs to the glass.
+- **Arrival-only figures.** Inside the illustration windows, cubes only
+  ever arrive (pack, stack); nothing printed is ever seen fading out.
+  The patch covers a figure's print from frame one, and a finished
+  figure retires with no transition because drawn == print.
 - **Marks anchor to their own ink.** A take's position always comes from
   its ink bottom; only *scale* may borrow guide geometry
   (`capture._fit`).
