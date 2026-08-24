@@ -1,11 +1,12 @@
 """Light on paper: the highlight idiom.
 
 The page can be written on (ink) and it can be lit — this module is the
-light. One warm wash of brand orange, eased in and out; the
+light. One cool wash in the ink's own blue, eased in and out; the
 same voice whether it sweeps the rows of an array, warms the active
-fact box, or lifts one face of the unit cube. Glows render on the paper
-layer, beneath the ink, because light falls on the page and writing
-sits on top of it.
+fact box, or lifts one face of the unit cube. Blue because the teacher's
+pen is blue: the light is her attention, the ink is her commitment.
+Glows render on the paper layer, beneath the ink, because light falls
+on the page and writing sits on top of it.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from dataclasses import dataclass, field
 
 from PIL import Image, ImageDraw
 
-from .brand import ORANGE
+from .brand import INK
 
 
 def _hex(c: str) -> tuple[int, int, int]:
@@ -33,9 +34,9 @@ class Glow:
     t_out: float
     fade_in: float = 0.28
     fade_out: float = 0.4
-    max_alpha: int = 115
+    max_alpha: int = 90
     radius: float = 0.0                   # >0: shape treated as rect corners
-    color: str = ORANGE
+    color: str = INK
 
     def alpha(self, t: float) -> float:
         if t < self.t_in or t > self.t_out + self.fade_out:

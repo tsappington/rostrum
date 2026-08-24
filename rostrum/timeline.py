@@ -101,6 +101,11 @@ class Timeline:
             )
 
         out = []
-        for i, s in enumerate(sorted(self.segs, key=lambda x: x.t0), 1):
-            out.append(f"{i}\n{fmt(s.t0)} --> {fmt(s.end + 0.15)}\n{wrap(s.text)}\n")
+        segs = sorted(self.segs, key=lambda x: x.t0)
+        for i, s in enumerate(segs, 1):
+            end = s.end + 0.15
+            if i < len(segs):                      # cues never overlap: a clip's
+                end = min(end, segs[i].t0 - 0.03)  # silent tail cedes to the next
+            out.append(f"{i}\n{fmt(s.t0)} --> {fmt(max(end, s.t0 + 0.3))}\n"
+                       f"{wrap(s.text)}\n")
         return "\n".join(out)
