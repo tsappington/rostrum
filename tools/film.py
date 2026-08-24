@@ -93,12 +93,14 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
         t = tl.t if at is None else at
         keys1.append((t, X1, keys1[-1][2]))
         keys1.append((t + dur, X1, y))
+        return t + dur                        # when the camera settles
 
     def cam2(y, dur=1.4, at=None):
         t = tl.t if at is None else at
         prev_y = keys2[-1][2] if keys2 else y
         keys2.append((t, X2, prev_y))
         keys2.append((t + dur, X2, y))
+        return t + dur
 
     def blank_ink(prompt, blank, cap, t0, key, align="center"):
         w = lib.width_pt(prompt, cap, key)
@@ -116,7 +118,7 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
 
     def row_glow(track, row_band, t_in, t_out):
         track.add(rect(TABLE_X[0], row_band[0], TABLE_X[1], row_band[1]),
-                  t_in, t_out, max_alpha=30, radius=6, fade_out=0.8)
+                  t_in, t_out, max_alpha=48, radius=6, fade_out=0.8)
 
     # ================= PART A — page 1 =================
     # Beat 0 — cold open
@@ -148,7 +150,7 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
                "rows, four in each row:", gap=0.3)
     g = DN1
     glow1.add(rect(g[0], g[1], g[0] + g[3] * g[2], g[1] + g[4] * g[2]),
-              s.token_start("multiply"), s.end, max_alpha=48, radius=2)
+              s.token_start("multiply"), s.end, max_alpha=77, radius=2)
     eq_t0 = tl.t
     eq_end = blank_ink("eq", eq_b, 14, eq_t0, "b2.eq", align="left")
     tl.say("Three times four… is twelve.", at=eq_t0 + 0.45 * (eq_end - eq_t0))
@@ -172,7 +174,7 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
         end = blank_ink(take, blank, 11, t_ink, f"b3.f{i + 1}")
         ans = tl.say(answer, at=max(t_ink + 0.15, end - 0.55))
         b = DN2_BOXES[i]
-        glow1.add(rect(*b), sp.t0 + 0.05, ans.end + 0.15, max_alpha=40,
+        glow1.add(rect(*b), sp.t0 + 0.05, ans.end + 0.15, max_alpha=64,
                   radius=8)
         tl.t = max(end, ans.end) + 0.4
 
@@ -181,10 +183,10 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
                "two units.", gap=0.35)
     cam1(Y_AREA, at=s.t0 + 0.2)
     t5 = s.token_start("five")
-    glow1.add(rect(*LABEL_5U, pad=2.5), t5, t5 + 1.2, radius=3, max_alpha=60)
+    glow1.add(rect(*LABEL_5U, pad=2.5), t5, t5 + 1.2, radius=3, max_alpha=96)
     glow1.sweep(_grid_cols(DN3), t5 + 0.1, step=0.22, hold=0.5, radius=2)
     t2 = s.token_start("two")
-    glow1.add(rect(*LABEL_2U, pad=2.5), t2, t2 + 1.2, radius=3, max_alpha=60)
+    glow1.add(rect(*LABEL_2U, pad=2.5), t2, t2 + 1.2, radius=3, max_alpha=96)
     glow1.sweep(_grid_rows(DN3), t2 + 0.1, step=0.3, hold=0.5, radius=2)
     s = tl.say("Area is length times width. Five times two:", gap=0.25)
     t_ink = tl.t
@@ -200,7 +202,7 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
                "figure takes up. We measure it in cubic units.", gap=0.4)
     marks["B"] = s.t0 - 0.4
     tv = s.token_start("Volume")
-    glow1.add(rect(*TERM_VOLUME, pad=3), tv, tv + 2.0, radius=3, max_alpha=56)
+    glow1.add(rect(*TERM_VOLUME, pad=3), tv, tv + 2.0, radius=3, max_alpha=90)
     s2 = tl.say("Look at the picture — this box is packed with twelve unit "
                 "cubes. So its volume… is twelve cubic units.", gap=0.45)
     slab = Figure.extract(*FIG_SLAB)
@@ -214,13 +216,13 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
                 "unit tall. The building block we measure with.", gap=0.4)
     tu = s3.token_start("unit")
     glow1.add(rect(*TERM_UNITCUBE, pad=3), tu, tu + 2.0, radius=3,
-              max_alpha=56)
+              max_alpha=90)
     ucube = Figure.extract(*FIG_UCUBE)
     faces = {f.fill: f.verts for f in ucube.cubes[0]}
     for word, tone in (("long", (207, 196, 180)), ("wide", (230, 222, 208)),
                        ("tall", (250, 246, 241))):
         tw = s3.token_start(word)
-        glow1.add(faces[tone][:4], tw, tw + 0.75, max_alpha=84, fade_in=0.18)
+        glow1.add(faces[tone][:4], tw, tw + 0.75, max_alpha=120, fade_in=0.18)
     tl.say("That's all volume is. Count the cubes.", gap=0.4)
     tl.pause(0.7)
 
@@ -272,23 +274,26 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
                "layer stacked on top.", gap=0.3)
     marks["C"] = s.t0 - 0.4
     r3_t0 = s.t0
-    cam2(Y_ROW3, at=s.t0 + 0.2)
+    arrive = cam2(Y_ROW3, at=s.t0 + 0.2)
     prism3 = Figure.extract(*FIG_PRISM3)
     bottom, top = prism3.layer_split()
-    t_stack = s.token_start("stacked") - 0.55
+    # the print stays whole until the camera settles on the row; only then
+    # does the top layer dissolve away — leaving prism one — and return,
+    # raised, to land on "stacked"
+    t_stack = max(s.token_start("stacked") - 0.55, arrive + 1.0)
     figs.append((1, prism3, {"kind": "land", "t0": t_stack, "dur": 0.9,
                              "drop_h": 22.0, "static": bottom, "moving": top,
-                             "lead": t_stack - s.t0 + 0.2, "fade_in": 0.25,
-                             "patch_fade": 0.45, "settle": 0.35,
-                             "dissolve": 0.4}))
+                             "lead": t_stack - (arrive + 0.25),
+                             "fade_in": 0.25, "patch_fade": 0.45,
+                             "settle": 0.35, "dissolve": 0.4}))
     s = tl.say("Twelve cubes in a layer.", gap=0.12)
     end = cell_ink("n12", 2, "cpl", s.token_start("Twelve") + 0.1, "gp3.cpl")
     tl.t = max(tl.t, end) + 0.25
     s = tl.say("Two layers.", gap=0.12)
     end = cell_ink("n2", 2, "lay", s.token_start("Two") + 0.1, "gp3.lay")
     tl.t = max(tl.t, end) + 0.3
-    s = tl.say("Twelve… twenty-four.", gap=0.12)
-    end = cell_ink("n24", 2, "vol", s.t0 + 0.3, "gp3.vol")
+    s = tl.say("Twelve times two — twenty-four cubic units.", gap=0.12)
+    end = cell_ink("n24", 2, "vol", s.token_start("twenty") - 0.1, "gp3.vol")
     tl.t = max(tl.t, end) + 0.4
     row_glow(glow2, TABLE_ROWS[2], r3_t0, tl.t)
     tl.say("Volume is area — stacked.", gap=0.8)

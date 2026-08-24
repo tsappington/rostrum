@@ -1,7 +1,7 @@
 """Light on paper: the highlight idiom.
 
 The page can be written on (ink) and it can be lit — this module is the
-light. One warm wash, brand orange at low alpha, eased in and out; the
+light. One warm wash of brand orange, eased in and out; the
 same voice whether it sweeps the rows of an array, warms the active
 fact box, or lifts one face of the unit cube. Glows render on the paper
 layer, beneath the ink, because light falls on the page and writing
@@ -33,7 +33,7 @@ class Glow:
     t_out: float
     fade_in: float = 0.28
     fade_out: float = 0.4
-    max_alpha: int = 72
+    max_alpha: int = 115
     radius: float = 0.0                   # >0: shape treated as rect corners
     color: str = ORANGE
 
