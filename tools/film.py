@@ -137,10 +137,13 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
     s = tl.say("Let's check it. Three rows… of four squares.", gap=0.6)
     marks["A"] = s.t0 - 0.4
     cam1(Y_P1, at=s.t0 + 0.2)
-    glow1.sweep(_grid_rows(DN1), s.token_start("Three"), step=0.42, hold=0.7,
-                radius=2)
-    glow1.sweep(_grid_cols(DN1), s.token_start("four"), step=0.3, hold=0.6,
-                radius=2)
+    rows_end = glow1.sweep(_grid_rows(DN1), s.token_start("Three"),
+                           step=0.42, hold=0.7, radius=2)
+    # rows finish, a breath, then the columns — never overlapping
+    cols_t0 = max(s.token_start("four"), rows_end + 1.0)
+    cols_end = glow1.sweep(_grid_cols(DN1), cols_t0, step=0.3, hold=0.6,
+                           radius=2)
+    tl.t = max(tl.t, cols_end + 0.35)
     s = tl.say("I could count them one by one — or I can multiply. Three "
                "rows, four in each row:", gap=0.3)
     g = DN1
@@ -202,9 +205,11 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
                 "cubes. So its volume… is twelve cubic units.", gap=0.45)
     slab = Figure.extract(*FIG_SLAB)
     t_pack = s2.token_start("packed")
-    figs.append((0, slab, {"kind": "assemble", "t0": t_pack, "stagger": 0.11,
-                           "drop": 0.24, "drop_h": 14.0,
-                           "lead": t_pack - s2.t0 + 0.2}))
+    figs.append((0, slab, {"kind": "assemble", "t0": t_pack, "stagger": 0.16,
+                           "drop": 0.32, "drop_h": 14.0,
+                           "lead": t_pack - s2.t0 + 0.2,
+                           "patch_fade": 0.45, "settle": 0.3,
+                           "dissolve": 0.4}))
     s3 = tl.say("And a unit cube — a cube one unit long, one unit wide, one "
                 "unit tall. The building block we measure with.", gap=0.4)
     tu = s3.token_start("unit")
@@ -273,7 +278,9 @@ def build(voice: str = "af_sarah", speed: float = 0.92):
     t_stack = s.token_start("stacked") - 0.55
     figs.append((1, prism3, {"kind": "land", "t0": t_stack, "dur": 0.9,
                              "drop_h": 22.0, "static": bottom, "moving": top,
-                             "lead": t_stack - s.t0 + 0.2, "fade_in": 0.25}))
+                             "lead": t_stack - s.t0 + 0.2, "fade_in": 0.25,
+                             "patch_fade": 0.45, "settle": 0.35,
+                             "dissolve": 0.4}))
     s = tl.say("Twelve cubes in a layer.", gap=0.12)
     end = cell_ink("n12", 2, "cpl", s.token_start("Twelve") + 0.1, "gp3.cpl")
     tl.t = max(tl.t, end) + 0.25

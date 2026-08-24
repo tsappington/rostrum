@@ -39,6 +39,7 @@ class Figure:
 
     cubes: list[list[Face]]               # each cube: [left, right, top]
     bbox: tuple[float, float, float, float]
+    edge_width: float = 0.8               # the print's own stroke weight
 
     # a cube face is identified by the print's own three face tones
     TONES = {(207, 196, 180), (230, 222, 208), (250, 246, 241)}
@@ -69,10 +70,21 @@ class Figure:
                           if d.get("color") else None)
                 faces.append(Face(verts, fill, stroke, d.get("width") or 1.2))
         assert len(faces) % 3 == 0, f"{len(faces)} faces — not cube triples"
+        # the print's own edge weight, measured from its stroke paths
+        widths: dict[float, int] = {}
+        with page_mod.open_doc() as doc:
+            for d in doc[page_index].get_drawings():
+                if d.get("color") and not d.get("fill") \
+                   and region.intersects(d["rect"]):
+                    c = tuple(int(v * 255) for v in d["color"])
+                    if c == cls.NAVY:
+                        w = d.get("width") or 0.8
+                        widths[w] = widths.get(w, 0) + 1
+        edge = max(widths, key=widths.get) if widths else 0.8
         cubes = [faces[i:i + 3] for i in range(0, len(faces), 3)]
         xs = [x for f in faces for x, _ in f.verts]
         ys = [y for f in faces for _, y in f.verts]
-        return cls(cubes, (min(xs), min(ys), max(xs), max(ys)))
+        return cls(cubes, (min(xs), min(ys), max(xs), max(ys)), edge)
 
     # ---- rendering --------------------------------------------------------
 
@@ -81,11 +93,12 @@ class Figure:
 
     def _draw_cube(self, d: ImageDraw.ImageDraw, cube: list[Face],
                    to_px, dy_pt: float, scale: float) -> None:
+        w = max(int(round(self.edge_width * scale)), 1)
         for f in cube:
             pts = [to_px(x, y + dy_pt) for x, y in f.verts]
             outline = f.stroke if f.stroke else self.NAVY
             d.polygon(pts, fill=(*f.fill, 255), outline=(*outline, 255),
-                      width=max(int(round(f.width * scale)), 1))
+                      width=w)
 
     def layer_split(self) -> tuple[list[int], list[int]]:
         """(bottom, top) cube indices. A cube is bottom-layer iff its top
@@ -121,34 +134,61 @@ class Figure:
 
     def render(self, comp: Image.Image, box, scale: float, union,
                t: float, spec: dict) -> None:
-        """Draw the figure's animated state; after the end, draw nothing
-        (the patch retires and the print shows through)."""
+        """Draw the figure's animated state under an alpha envelope.
+
+        The whole overlay — patch plus drawn cubes — dissolves IN at the
+        lead (the printed art fades away, never pops) and dissolves OUT
+        after the settle, resolving into the print beneath. Between cuts
+        and dissolves the print itself is the ground truth on screen.
+        """
         t0, kind = spec["t0"], spec["kind"]
         if kind == "assemble":
-            stag, drop = spec.get("stagger", 0.11), spec.get("drop", 0.24)
+            stag, drop = spec.get("stagger", 0.16), spec.get("drop", 0.32)
             t_end = t0 + (len(self.cubes) - 1) * stag + drop
         else:                                        # "land"
             dur = spec.get("dur", 0.9)
             t_end = t0 + dur
-        if t < t0 - spec.get("lead", 2.5) or t > t_end + 0.05:
+        settle = spec.get("settle", 0.3)
+        patch_fade = spec.get("patch_fade", 0.4)
+        dissolve = spec.get("dissolve", 0.4)
+        lead_start = t0 - spec.get("lead", 2.5)
+        if t < lead_start or t > t_end + settle + dissolve:
             return
-
-        def to_px(x, y):
-            return ((x - union[0]) * scale - box[0],
-                    (y - union[1]) * scale - box[1])
-
-        # the patch: flat panel color over the printed art while we animate
-        b = self.bbox
-        pad = 3.0
-        p0 = to_px(b[0] - pad, b[1] - pad)
-        p1 = to_px(b[2] + pad, b[3] + pad)
-        if p1[0] < 0 or p0[0] > comp.width or p1[1] < 0 or p0[1] > comp.height:
+        env = _ease_out(min((t - lead_start) / patch_fade, 1.0))
+        if t > t_end + settle:
+            env *= 1.0 - _ease_out((t - t_end - settle) / dissolve)
+        if env <= 0.005:
             return
-        d = ImageDraw.Draw(comp)
-        sample = comp.getpixel((max(int(p0[0]) - 6, 0), max(int(p0[1]), 0)))
-        d.rectangle([p0, p1], fill=sample)
 
         drop_h = spec.get("drop_h", 16.0)
+        b = self.bbox
+        pad = 3.0
+        # the overlay layer: the patch region plus headroom for the drop
+        head = drop_h + 6.0
+        ox_pt, oy_pt = b[0] - pad, b[1] - pad - head
+        lw = int((b[2] - b[0] + 2 * pad) * scale) + 4
+        lh = int((b[3] - b[1] + 2 * pad + head) * scale) + 4
+
+        def on_screen(x_pt, y_pt):
+            return ((x_pt - union[0]) * scale - box[0],
+                    (y_pt - union[1]) * scale - box[1])
+
+        o_px = on_screen(ox_pt, oy_pt)
+        if o_px[0] + lw < 0 or o_px[0] > comp.width or \
+           o_px[1] + lh < 0 or o_px[1] > comp.height:
+            return
+
+        def to_px(x_pt, y_pt):
+            return ((x_pt - ox_pt) * scale, (y_pt - oy_pt) * scale)
+
+        layer = Image.new("RGBA", (lw, lh), (0, 0, 0, 0))
+        d = ImageDraw.Draw(layer)
+        sx = min(max(int(o_px[0]) - 6, 0), comp.width - 1)
+        sy = min(max(int(o_px[1] + head * scale), 0), comp.height - 1)
+        sample = comp.getpixel((sx, sy))[:3]
+        d.rectangle([to_px(b[0] - pad, b[1] - pad),
+                     to_px(b[2] + pad, b[3] + pad)], fill=(*sample, 255))
+
         if kind == "assemble":
             for i, cube in enumerate(self.cubes):
                 ti = t0 + i * stag
@@ -157,32 +197,27 @@ class Figure:
                 u = _ease_out((t - ti) / drop)
                 self._draw_cube(d, cube, to_px, -(1 - u) * drop_h, scale)
         else:
-            base = spec["static"]
-            moving = spec["moving"]
-            for i in base:
+            for i in spec["static"]:
                 self._draw_cube(d, self.cubes[i], to_px, 0.0, scale)
-            # the arriving layer fades in just before its descent — the
-            # figure shouldn't hover through the whole narration lead
+            # the arriving layer fades in just before its descent
             appear = spec.get("fade_in", 0.25)
             a = max(0.0, min(1.0, (t - (t0 - appear)) / appear))
-            if a <= 0.0:
-                return
-            u = _ease_out((t - t0) / dur) if t >= t0 else 0.0
-            dy = -(1 - u) * drop_h
-            if a >= 1.0:
-                for i in moving:
-                    self._draw_cube(d, self.cubes[i], to_px, dy, scale)
-            else:
-                pad_px = int(drop_h * scale) + 8
-                lx0, ly0 = int(p0[0]), int(p0[1]) - pad_px
-                layer = Image.new("RGBA",
-                                  (int(p1[0]) - lx0 + 8,
-                                   int(p1[1]) - ly0 + 8), (0, 0, 0, 0))
-                ld = ImageDraw.Draw(layer)
-                shift = lambda x, y: (to_px(x, y)[0] - lx0,
-                                      to_px(x, y)[1] - ly0)
-                for i in moving:
-                    self._draw_cube(ld, self.cubes[i], shift, dy, scale)
-                alpha = layer.getchannel("A").point(lambda v: int(v * a))
-                layer.putalpha(alpha)
-                comp.alpha_composite(layer, (lx0, ly0))
+            if a > 0.0:
+                u = _ease_out((t - t0) / dur) if t >= t0 else 0.0
+                dy = -(1 - u) * drop_h
+                if a >= 1.0:
+                    for i in spec["moving"]:
+                        self._draw_cube(d, self.cubes[i], to_px, dy, scale)
+                else:
+                    sub = Image.new("RGBA", (lw, lh), (0, 0, 0, 0))
+                    sd = ImageDraw.Draw(sub)
+                    for i in spec["moving"]:
+                        self._draw_cube(sd, self.cubes[i], to_px, dy, scale)
+                    alpha = sub.getchannel("A").point(lambda v: int(v * a))
+                    sub.putalpha(alpha)
+                    layer.alpha_composite(sub)
+
+        if env < 1.0:
+            alpha = layer.getchannel("A").point(lambda v: int(v * env))
+            layer.putalpha(alpha)
+        comp.alpha_composite(layer, (int(o_px[0]), int(o_px[1])))

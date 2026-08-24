@@ -35,6 +35,7 @@ class Glow:
     fade_out: float = 0.4
     max_alpha: int = 72
     radius: float = 0.0                   # >0: shape treated as rect corners
+    color: str = ORANGE
 
     def alpha(self, t: float) -> float:
         if t < self.t_in or t > self.t_out + self.fade_out:
@@ -68,11 +69,11 @@ class GlowTrack:
 
     def render(self, comp: Image.Image, box, scale: float,
                union, t: float) -> None:
-        color = _hex(ORANGE)
         for g in self.events:
             a = g.alpha(t)
             if a <= 0.01:
                 continue
+            color = _hex(g.color)
             pts = [((x - union[0]) * scale - box[0],
                     (y - union[1]) * scale - box[1]) for x, y in g.shape]
             xs = [p[0] for p in pts]
