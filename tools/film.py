@@ -372,9 +372,12 @@ def main():
 
     def under_for(cam, track, page_figs, t):
         def under(comp, box):
-            track.render(comp, box, cam.scale, cam.union, t)
+            # figures first, light after: the glow washes a drawn figure
+            # exactly as it washes the print, so a dissolve never shifts
+            # the cubes' tint under an active row highlight
             for fig, spec in page_figs:
                 fig.render(comp, box, cam.scale, cam.union, t, spec)
+            track.render(comp, box, cam.scale, cam.union, t)
         return under
 
     fps = 60
