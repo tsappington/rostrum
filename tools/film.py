@@ -22,6 +22,7 @@ import sys
 import time
 from types import SimpleNamespace
 
+import numpy as np
 import soundfile as sf
 
 from rostrum import capture, chip
@@ -30,7 +31,7 @@ from rostrum.figures import Figure
 from rostrum.glow import GlowTrack, rect
 from rostrum.page import find_blanks
 from rostrum.render import MovingRostrum, mux, write_video
-from rostrum.timeline import Timeline
+from rostrum.timeline import Seg, Timeline
 from rostrum.tts import SR, Narrator
 
 DATA = "assets/strokes/capture_ted_v3.json"
@@ -73,17 +74,6 @@ def _row_y(g, i):
     return g[1] + g[2] * (i + 0.5)
 
 
-def _p2_layers():
-    """Prism 2's three layers as the art's own face polygons (bottom-up).
-    A rectangular band overhangs a leaning isometric prism; lighting the
-    faces themselves colors the cubes and nothing else."""
-    fig = Figure.extract(1, (120.0, 303.0, 200.0, 400.0))
-    tops = [min(sum(y for _, y in f.verts) / len(f.verts) for f in cube)
-            for cube in fig.cubes]
-    order = sorted(range(len(fig.cubes)), key=lambda i: -tops[i])
-    per = len(fig.cubes) // 3
-    return [[f.verts for i in order[k * per:(k + 1) * per]
-             for f in fig.cubes[i]] for k in range(3)]
 
 
 def _grid_rows(g):
@@ -143,20 +133,32 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
         track.add(rect(TABLE_X[0], row_band[0], TABLE_X[1], row_band[1]),
                   t_in, t_out, max_alpha=38, radius=6, fade_out=0.8)
 
-    def count_along(after_end, words=("One,", "Two,", "Three."),
-                    cad=1.5, lead_gap=0.55):
-        """Speak a count with the timeline as metronome. Each word is its
-        own segment, placed so the SPOKEN words tick every `cad` seconds
-        (Kokoro pads short clips with silence — clip starts don't count).
-        Returns the moments the words actually sound."""
+    def count_along(after_end, phrase="One… two… three.", cad=1.5,
+                    lead_gap=0.55):
+        """Speak a count with the timeline as metronome. The whole phrase
+        is synthesized once — words spoken mid-phrase carry a natural
+        counting contour, where isolated one-word clips come out clipped
+        and emphatic with breath junk in their padding — then each word
+        is sliced out (edges faded) and placed so the spoken counts tick
+        every `cad` seconds. Returns the moments the words sound."""
+        audio, toks = tl.n.say(phrase)
+        words = [(w, a, b) for w, a, b in toks if w[0].isalnum()]
         times: list[float] = []
-        for w in words:
-            _, toks = tl.n.say(w)               # cached probe: word's own lead
-            lead = next(a for txt, a, _ in toks if txt[0].isalnum())
-            at = (after_end + lead_gap - lead) if not times \
-                else times[-1] + cad - lead
-            tl.say(w, at=at)
-            times.append(at + lead)
+        for k, (w, a, b) in enumerate(words):
+            s0 = max(a - 0.06, 0.0 if k == 0 else words[k - 1][2])
+            s1 = min(b + 0.12, len(audio) / SR if k == len(words) - 1
+                     else words[k + 1][1] - 0.01)
+            clip = audio[int(s0 * SR):int(s1 * SR)].copy()
+            n = max(int(0.012 * SR), 1)
+            clip[:n] *= np.linspace(0.0, 1.0, n)
+            clip[-n:] *= np.linspace(1.0, 0.0, n)
+            tick = (after_end + lead_gap) if not times else times[-1] + cad
+            base = "".join(ch for ch in w if ch.isalnum())
+            seg = Seg(tick - (a - s0), clip, [(base, a - s0, b - s0)],
+                      base + ("." if k == len(words) - 1 else ","))
+            tl.segs.append(seg)
+            tl.t = max(tl.t, seg.end)
+            times.append(tick)
         return times
 
     # ================= PART A — page 1 =================
@@ -198,7 +200,7 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     # …and the columns get the same treatment: count, light, hop
     s = tl.say("And how many squares in each row? Count with me:", gap=0.0)
     cols = _grid_cols(DN1)
-    col_counts = count_along(s.end, words=("One,", "Two,", "Three,", "Four."),
+    col_counts = count_along(s.end, phrase="One, two, three, four.",
                              cad=1.15, lead_gap=0.45)
     s = tl.say("Four in each row.", at=col_counts[3] + 1.05, gap=0.4)
     col_hold = s.end + 0.5
@@ -226,35 +228,52 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     tl.pause(0.7)
     marks["A_end"] = tl.t
 
-    # Beat 3 — the five facts, each box warming as it's worked
+    # Beat 3 — the five facts, one varied breath each, boxes warming
     s = tl.say("Quick practice — say them with me.", gap=0.45)
+    marks["D"] = s.t0 - 0.4
     cam1(Y_SOLVE, at=s.t0 + 0.1)
-    facts = [("Three times four —", "is twelve.", "n12"),
-             ("Four times two —", "is eight.", "n8"),
-             ("Two times five —", "is ten.", "n10"),
-             ("Five times six —", "is thirty.", "n30"),
-             ("Four times seven —", "is twenty-eight.", "n28")]
-    for i, ((prompt_text, answer, take), blank) in enumerate(zip(facts, fact_bs)):
-        sp = tl.say(prompt_text, gap=0.12)
-        t_ink = tl.t
-        end = blank_ink(take, blank, 11, t_ink, f"b3.f{i + 1}")
-        ans = tl.say(answer, at=max(t_ink + 0.15, end - 0.55))
-        b = DN2_BOXES[i]
-        glow1.add(rect(*b), sp.t0 + 0.05, ans.end + 0.15, max_alpha=50,
-                  radius=8)
-        tl.t = max(end, ans.end) + 0.4
+    facts = [("Three times four is twelve.", "twelve", "n12"),
+             ("Four times two is eight.", "eight", "n8"),
+             ("Two times five… ten.", "ten", "n10"),
+             ("Five times six? Thirty.", "Thirty", "n30"),
+             ("And four times seven is twenty-eight.", "twenty", "n28")]
+    for i, ((line, cue, take), blank) in enumerate(zip(facts, fact_bs)):
+        sp = tl.say(line, gap=0.12)
+        end = blank_ink(take, blank, 11, sp.token_start(cue) - 0.1,
+                        f"b3.f{i + 1}")
+        glow1.add(rect(*DN2_BOXES[i]), sp.t0 + 0.05,
+                  max(end, sp.end) + 0.2, max_alpha=50, radius=8)
+        tl.t = max(end, sp.end) + 0.4
 
-    # Beat 4 — area: labels lift, the grid sweeps again
-    s = tl.say("One more warm-up: area. This rectangle is five units long… "
-               "and two units wide.", gap=0.35)
+    # Beat 4 — area: the Do Now 1 idiom, abbreviated. Each dimension
+    # lights cumulatively, the full rectangle takes the flourish, the
+    # light releases, and the second dimension answers the first.
+    s = tl.say("One more warm-up: area. This rectangle is five units "
+               "wide…", gap=0.0)
     cam1(Y_AREA, at=s.t0 + 0.2)
+    full3 = rect(DN3[0], DN3[1], DN3[0] + DN3[3] * DN3[2],
+                 DN3[1] + DN3[4] * DN3[2])
     t5 = s.token_start("five")
-    glow1.add(rect(*LABEL_5U, pad=2.5), t5, t5 + 1.2, radius=3, max_alpha=75)
-    glow1.sweep(_grid_cols(DN3), t5 + 0.1, step=0.22, hold=0.5, radius=2)
+    glow1.add(rect(*LABEL_5U, pad=2.5), t5, t5 + 1.4, radius=3, max_alpha=75)
+    c_last = t5 + 0.15 + 4 * 0.18
+    wide_out = c_last + 1.05
+    for k, sh in enumerate(_grid_cols(DN3)):
+        glow1.add(sh, t5 + 0.15 + k * 0.18, wide_out, radius=2)
+    for tb in (c_last + 0.25, c_last + 0.65):
+        glow1.add(full3, tb, tb + 0.2, fade_in=0.1, fade_out=0.12,
+                  max_alpha=70, radius=2)
+    s = tl.say("And two units high.", at=wide_out + 0.4, gap=0.3)
     t2 = s.token_start("two")
-    glow1.add(rect(*LABEL_2U, pad=2.5), t2, t2 + 1.2, radius=3, max_alpha=75)
-    glow1.sweep(_grid_rows(DN3), t2 + 0.1, step=0.3, hold=0.5, radius=2)
-    s = tl.say("Area is length times width. Five times two:", gap=0.25)
+    glow1.add(rect(*LABEL_2U, pad=2.5), t2, t2 + 1.4, radius=3, max_alpha=75)
+    r_last = t2 + 0.15 + 0.3
+    high_out = r_last + 1.05
+    for k, sh in enumerate(_grid_rows(DN3)):
+        glow1.add(sh, t2 + 0.15 + k * 0.3, high_out, radius=2)
+    for tb in (r_last + 0.25, r_last + 0.65):
+        glow1.add(full3, tb, tb + 0.2, fade_in=0.1, fade_out=0.12,
+                  max_alpha=70, radius=2)
+    tl.t = max(tl.t, high_out + 0.35)
+    s = tl.say("Area is width times height. Five times two:", gap=0.25)
     t_ink = tl.t
     end = blank_ink("n10", area_b, 12, t_ink, "b4.area")
     ans = tl.say("Ten square units.", at=max(t_ink + 0.15, end - 0.5))
@@ -262,6 +281,7 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     s = tl.say("So area counts the squares that cover a flat shape. Keep "
                "that idea close — we're about to give it a third dimension.",
                gap=0.7)
+    marks["D_end"] = tl.t
     cam1(Y_VOCAB, dur=2.2, at=s.t0 + 0.6)
 
     # Beat 5 — vocabulary: terms lift, the box packs, the cube's faces light
@@ -274,9 +294,12 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
                 "cubes.", gap=0.15)
     slab = Figure.extract(*FIG_SLAB)
     t_pack = s2.token_start("packed")
+    # the printed example stays on the page (it is on the student's own
+    # sheet) until the teacher reaches it: fade it clear, then pack it
     figs.append((0, slab, {"kind": "assemble", "t0": t_pack, "stagger": 0.16,
                            "drop": 0.32, "drop_h": 14.0,
-                           "cover_from": 0.0, "settle": 0.4}))
+                           "cover_from": t_pack - 1.1, "cover_fade": 0.45,
+                           "settle": 0.4}))
     t_packed = t_pack + (len(slab.cubes) - 1) * 0.16 + 0.32
     tl.t = max(tl.t, t_packed + 0.25)          # let the last cube land
     tl.say("Twelve cubes fit inside — so its volume is twelve cubic units.",
@@ -316,8 +339,9 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     ans = tl.say("Twelve cubic units.", at=max(tl.t + 0.1, end - 0.6))
     tl.t = max(end, ans.end) + 0.35
     row_glow(glow2, TABLE_ROWS[0], r1_t0, tl.t)
-    tl.say("Just one layer — so counting the cubes felt like counting the "
-           "squares. Flat… but already three-D.", gap=0.7)
+    tl.say("Just one layer — so counting the cubes felt a lot like counting "
+           "flat squares. Only one unit tall… but officially three-D.",
+           gap=0.7)
 
     # Beat 7 — row 2, the surprise
     s = tl.say("Prism two looks totally different — tall, and thin. Cubes in "
@@ -330,24 +354,23 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     s = tl.say("Layers? Count them with me:", gap=0.0)
     lc = count_along(s.end, cad=1.35, lead_gap=0.45)
     tl.t = max(tl.t, lc[2] + 1.0)
-    layer_hold = lc[2] + 1.0
-    for t_c, shape in zip(lc, _p2_layers()):
-        glow2.add(shape, t_c, layer_hold, max_alpha=55)
+    # the wand and the voice carry this count alone — a wash over the
+    # leaning isometric art read as patchwork, tried twice and cut
     wands.append(Wand(1, [(lc[i], WAND_P2_X,
                            P2_ART[3] - (P2_ART[3] - P2_ART[1]) / 3.0
                            * (i + 0.5)) for i in range(3)],
                       t_in=lc[0] - 0.4, t_out=lc[2] + 0.9,
                       flourish=[lc[2] + 0.12]))
     end = cell_ink("n3", 1, "lay", lc[2] - 0.05, "gp2.lay")
-    tl.t = max(tl.t, end, layer_hold) + 0.25
+    tl.t = max(tl.t, end, lc[2] + 1.0) + 0.25
     s = tl.say("Four times three —", gap=0.12)
     end = cell_ink("n12", 1, "vol", tl.t, "gp2.vol")
     ans = tl.say("Twelve again! A different prism — the same volume.",
                  at=max(tl.t + 0.1, end - 0.4))
     tl.t = max(end, ans.end) + 0.3
     row_glow(glow2, TABLE_ROWS[1], r2_t0, tl.t)
-    tl.say("Volume doesn't care what a prism looks like. It counts the "
-           "cubes inside.", gap=0.7)
+    tl.say("The shape doesn't matter — volume counts the cubes inside.",
+           gap=0.7)
 
     # Beat 8 — row 3: the thesis, and the layer lands
     s = tl.say("Prism three. Look closely — it's prism one, with a second "
@@ -356,14 +379,18 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     arrive = cam2(Y_ROW3, at=s.t0 + 0.2)
     prism3 = Figure.extract(*FIG_PRISM3)
     bottom, top = prism3.layer_split()
-    # arrival-only: prism 3 shows just its bottom layer — prism one —
-    # from the page turn onward; the second layer descends on "stacked",
-    # after the camera has settled on the row
-    t_stack = max(s.token_start("stacked") - 0.55, arrive + 1.0)
-    figs.append((1, prism3, {"kind": "land", "t0": t_stack, "dur": 0.9,
-                             "drop_h": 22.0, "static": bottom, "moving": top,
-                             "cover_from": t_cut, "fade_in": 0.15,
-                             "settle": 0.4}))
+    # the print — both layers, as on the student's sheet — holds until
+    # the camera settles; then it fades clear and the prism rebuilds in
+    # layers: the first drops on "prism one", the second on "stacked"
+    t_one = max(s.token_start("one") - 0.35, arrive + 1.2)
+    t_stack = max(s.token_start("stacked") - 0.55, t_one + 1.0)
+    figs.append((1, prism3, {"kind": "stack",
+                             "cover_from": arrive + 0.25, "cover_fade": 0.45,
+                             "fade_in": 0.15, "settle": 0.4,
+                             "drops": [{"t0": t_one, "idx": bottom,
+                                        "dur": 0.55, "drop_h": 18.0},
+                                       {"t0": t_stack, "idx": top,
+                                        "dur": 0.9, "drop_h": 22.0}]}))
     s = tl.say("We already counted this layer — twelve cubes.", gap=0.12)
     end = cell_ink("n12", 2, "cpl", s.token_start("twelve") + 0.1, "gp3.cpl")
     tl.t = max(tl.t, end) + 0.25
@@ -463,7 +490,7 @@ def main():
         which = sys.argv[2] if len(sys.argv) > 2 else "A"
         t0 = f.marks[which]
         t1 = {"A": f.marks["A_end"], "B": t_cut,
-              "C": f.marks["C_end"]}[which]
+              "C": f.marks["C_end"], "D": f.marks["D_end"]}[which]
         name = f"out/preview_{which}"
     else:
         t0, t1, name = 0.0, total, "out/volume_cubes_v3"

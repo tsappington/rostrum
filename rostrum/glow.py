@@ -61,13 +61,6 @@ class GlowTrack:
         self.events.append(g)
         return g
 
-    def sweep(self, shapes: list, t0: float, step: float,
-              hold: float = 0.55, **kw) -> float:
-        """Staggered glows — rows lighting one after another."""
-        for i, s in enumerate(shapes):
-            self.add(s, t0 + i * step, t0 + i * step + hold, **kw)
-        return t0 + (len(shapes) - 1) * step + hold
-
     def render(self, comp: Image.Image, box, scale: float,
                union, t: float) -> None:
         for g in self.events:

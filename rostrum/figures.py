@@ -8,13 +8,14 @@ prefix of that order is a correctly-occluded scene. Assembly replays
 the artist's draw order cube by cube; a layer landing floats one
 prefix-group above the rest.
 
-The grammar is arrival-only: the patch covers the print from before
-the panel is ever seen, so cubes are only ever ADDED — packed,
-stacked — and nothing on the page ever fades away (a viewer reads a
-fade-out as "huh, what happened?"; an arrival as "aha, one more").
-When the last cube settles, the drawn scene is pixel-registered to
-the print beneath, so the overlay retires with no transition at all —
-registration is guaranteed, not hoped for.
+The grammar: present, clear, build. The printed figure stays on
+screen exactly as it sits on the student's own sheet, until the
+narration reaches it — then it fades clear in one announced reset and
+rebuilds by arrival, cube by cube or layer by layer. During the build
+nothing ever fades away; the one fade-out is the curtain that starts
+it. When the last cube settles, the drawn scene is pixel-registered
+to the print beneath, so the overlay retires with no transition at
+all — registration is guaranteed, not hoped for.
 """
 
 from __future__ import annotations
@@ -141,26 +142,32 @@ class Figure:
 
     def render(self, comp: Image.Image, box, scale: float, union,
                t: float, spec: dict) -> None:
-        """Draw the figure's animated state, arrival-only.
+        """Draw the figure's animated state: present, clear, build.
 
-        From `cover_from` until the settle after the last motion, the
-        patch stands in for the print and cubes accumulate on top of
-        it. The panel is blank (or partial) before the figure's moment
-        arrives; nothing is ever seen leaving. At the end the drawn
-        scene equals the print, so the overlay simply stops rendering.
+        Before `cover_from` the print itself is on screen. Over
+        `cover_fade` the patch fades the print clear — the announced
+        reset — and then cubes accumulate on top of it: an "assemble"
+        packs cube by cube, a "stack" drops whole layers in sequence.
+        At the end the drawn scene equals the print, so the overlay
+        simply stops rendering.
         """
-        t0, kind = spec["t0"], spec["kind"]
+        kind = spec["kind"]
         if kind == "assemble":
+            t0 = spec["t0"]
             stag, drop = spec.get("stagger", 0.16), spec.get("drop", 0.32)
             t_end = t0 + (len(self.cubes) - 1) * stag + drop
-        else:                                        # "land"
-            dur = spec.get("dur", 0.9)
-            t_end = t0 + dur
+            drop_h = spec.get("drop_h", 16.0)
+        else:                                        # "stack"
+            t_end = max(d["t0"] + d.get("dur", 0.7) for d in spec["drops"])
+            drop_h = max(d.get("drop_h", 20.0) for d in spec["drops"])
         settle = spec.get("settle", 0.35)
-        if t < spec.get("cover_from", 0.0) or t > t_end + settle:
+        cover_from = spec.get("cover_from", 0.0)
+        if t < cover_from or t > t_end + settle:
             return
-
-        drop_h = spec.get("drop_h", 16.0)
+        fade = spec.get("cover_fade", 0.0)
+        env = _ease_out(min((t - cover_from) / fade, 1.0)) if fade else 1.0
+        if env <= 0.005:
+            return
         b = self.bbox
         pad = 3.0
         # the overlay layer: the patch region plus headroom for the drop
@@ -197,26 +204,30 @@ class Figure:
                 u = _ease_out((t - ti) / drop)
                 self._draw_cube(d, cube, to_px, -(1 - u) * drop_h, scale)
         else:
-            for i in spec["static"]:
-                self._draw_cube(d, self.cubes[i], to_px, 0.0, scale)
-            # the arriving layer appears already in motion — its opacity
-            # ramps only while it is descending, so the eye reads an
-            # entrance, never a materialization
+            # each layer appears already in motion — its opacity ramps
+            # only while it is descending, so the eye reads an entrance,
+            # never a materialization
             appear = spec.get("fade_in", 0.15)
-            if t >= t0:
-                a = min(1.0, (t - t0) / appear) if appear else 1.0
-                u = _ease_out((t - t0) / dur)
-                dy = -(1 - u) * drop_h
+            for dspec in spec["drops"]:
+                td, dur = dspec["t0"], dspec.get("dur", 0.7)
+                if t < td:
+                    continue
+                a = min(1.0, (t - td) / appear) if appear else 1.0
+                u = _ease_out((t - td) / dur)
+                dy = -(1 - u) * dspec.get("drop_h", 20.0)
                 if a >= 1.0:
-                    for i in spec["moving"]:
+                    for i in dspec["idx"]:
                         self._draw_cube(d, self.cubes[i], to_px, dy, scale)
                 else:
                     sub = Image.new("RGBA", (lw, lh), (0, 0, 0, 0))
                     sd = ImageDraw.Draw(sub)
-                    for i in spec["moving"]:
+                    for i in dspec["idx"]:
                         self._draw_cube(sd, self.cubes[i], to_px, dy, scale)
                     alpha = sub.getchannel("A").point(lambda v: int(v * a))
                     sub.putalpha(alpha)
                     layer.alpha_composite(sub)
 
+        if env < 1.0:
+            alpha = layer.getchannel("A").point(lambda v: int(v * env))
+            layer.putalpha(alpha)
         comp.alpha_composite(layer, (int(o_px[0]), int(o_px[1])))
