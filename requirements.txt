@@ -1,6 +1,12 @@
+# rendering
 pymupdf>=1.28
 pillow>=10.0
 numpy>=1.26
 imageio-ffmpeg>=0.5
 pyyaml>=6.0
-edge-tts>=6.1
+
+# narration — Kokoro-82M, local CPU inference. Pulls torch and friends;
+# the first build also downloads the model weights (~330 MB) from
+# Hugging Face into the local cache.
+kokoro>=0.9
+soundfile>=0.12
