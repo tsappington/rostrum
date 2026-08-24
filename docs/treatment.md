@@ -22,10 +22,13 @@ times: **volume is a count, not an appearance — area, stacked.**
 
 ## Grammar
 
-- **Camera:** one continuous instrument, not cuts. Full-page establish;
-  slow pushes into each region as it becomes the subject; lateral pans
+- **Camera:** one continuous instrument, and a single transition. Slow
+  pushes into each region as it becomes the subject; lateral pans
   between problems; the camera settles and holds still whenever the pen
-  is down. Movement between beats, stillness during writing.
+  is down. The one edit in the film is the page turn — a 0.7s dissolve
+  in the silence between Vocabulary and Guided Practice, landing on the
+  new section's own headline. Movement between beats, stillness during
+  writing.
 - **Ink:** one voice of blue (`#2D5FA8`) over the printed navy world.
   Answers on blanks; light annotation marks — always on the page's own
   artwork, never floating chrome.
@@ -46,7 +49,10 @@ times: **volume is a count, not an appearance — area, stacked.**
 - **The glass:** two citizens, both gesture, both orange. The pause
   chip ("you act now") and the wand ("look here") — a dot that pops in,
   hops with each spoken count, double-pulses on the last one like a
-  visual period, and pops out. It exists only while counting.
+  visual period, and pops out. It exists only while counting, and only
+  over the flat grid, where its position can be honest; beside a
+  foreshortened isometric solid a pointer lies about where the layers
+  are, so there the voice counts alone.
 - **Sound:** a single close-mic teacher voice (Kokoro-82M, open weights,
   word-timestamped). Room-tone silence between beats — the pauses are
   part of the instruction. No music.

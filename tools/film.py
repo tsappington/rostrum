@@ -24,6 +24,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import soundfile as sf
+from PIL import Image
 
 from rostrum import capture, chip
 from rostrum.chip import Wand
@@ -40,9 +41,11 @@ DATA = "assets/strokes/capture_ted_v3.json"
 VIEW = (536.0, 301.5)
 X1, X2 = 32.0, 37.0
 UNION1 = (X1, 60.0, X1 + VIEW[0], 750.0)
-UNION2 = (X2, 108.0, X2 + VIEW[0], 727.0)
+UNION2 = (X2, 60.0, X2 + VIEW[0], 727.0)
 Y_OPEN, Y_P1, Y_SOLVE, Y_AREA, Y_VOCAB = 64.0, 130.0, 170.0, 215.0, 444.0
-Y_ROW1, Y_ROW2, Y_ROW3, Y_ROW4 = 118.0, 225.0, 340.0, 420.0
+# page 2 opens on the section itself: "Guided Practice" (y 69-92), its
+# instruction line, the table header, and row 1 share the first frame
+Y_ROW1, Y_ROW2, Y_ROW3, Y_ROW4 = 60.0, 225.0, 340.0, 420.0
 
 # ---- page geometry (from the PDF's own vector data) -----------------------
 COL_X = {"cpl": 306.0, "lay": 412.5, "vol": 519.0}
@@ -65,9 +68,7 @@ FIG_SLAB = (0, (425.0, 490.0, 526.0, 570.0))
 FIG_UCUBE = (0, (440.0, 630.0, 510.0, 705.0))
 FIG_PRISM3 = (1, (60.0, 415.0, 320.0, 545.0))
 
-P2_ART = (127.0, 309.9, 191.7, 392.1)       # prism 2's cubes, page 2
 WAND_DN1_X = DN1[0] - 11.0                  # the wand waits left of the grid
-WAND_P2_X = P2_ART[2] + 13.0                # …and right of prism 2
 
 
 def _row_y(g, i):
@@ -359,13 +360,10 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     s = tl.say("Layers? Count them with me:", gap=0.0)
     lc = count_along(s.end, cad=1.35, lead_gap=0.45)
     tl.t = max(tl.t, lc[2] + 1.0)
-    # the wand and the voice carry this count alone — a wash over the
-    # leaning isometric art read as patchwork, tried twice and cut
-    wands.append(Wand(1, [(lc[i], WAND_P2_X,
-                           P2_ART[3] - (P2_ART[3] - P2_ART[1]) / 3.0
-                           * (i + 0.5)) for i in range(3)],
-                      t_in=lc[0] - 0.4, t_out=lc[2] + 0.9,
-                      flourish=[lc[2] + 0.12]))
+    # the voice counts this one alone — a wash over the leaning art read
+    # as patchwork, and a wand beside a foreshortened solid lies about
+    # where the layers are; the slow count invites the student to point
+    # at their own sheet
     end = cell_ink("n3", 1, "lay", lc[2] - 0.05, "gp2.lay")
     tl.t = max(tl.t, end, lc[2] + 1.0) + 0.25
     s = tl.say("Four times three —", gap=0.12)
@@ -494,7 +492,7 @@ def main():
     if mode == "clip":
         which = sys.argv[2] if len(sys.argv) > 2 else "A"
         t0 = f.marks[which]
-        t1 = {"A": f.marks["A_end"], "B": t_cut,
+        t1 = {"A": f.marks["A_end"], "B": t_cut + 1.2,
               "C": f.marks["C_end"], "D": f.marks["D_end"]}[which]
         name = f"out/preview_{which}"
     else:
@@ -505,6 +503,8 @@ def main():
     cam_b.ink.draw_until(ink_b, t0)
     t_start = time.time()
 
+    DISSOLVE = 0.7                        # the page turn
+
     def frames():
         for i in range(i0, i1):
             t = i / fps
@@ -514,6 +514,10 @@ def main():
             else:
                 cam_b.ink.draw_until(ink_b, t)
                 fr = cam_b.frame(t, under_for(cam_b, f.glow2, figs2, t))
+                if t < t_cut + DISSOLVE:  # page 1 yields to page 2
+                    fa = cam_a.frame(t, under_for(cam_a, f.glow1, figs1, t))
+                    u = (t - t_cut) / DISSOLVE
+                    fr = Image.blend(fa, fr, u * u * (3 - 2 * u))
             chip.overlay(fr, t, f.chips)
             for wd in f.wands:
                 if (wd.page == 0) == (t < t_cut):
