@@ -40,6 +40,32 @@ class Seg:
         return self.t0
 
 
+def _stretch_gap(audio: np.ndarray, toks, after: str, pause: float):
+    """Insert `pause` seconds of silence right after the token starting
+    with `after`, shifting later tokens. The sentence is synthesized
+    whole — its prosody is intact — and only the gap grows; punctuation
+    alone won't do it (the narrator gives an ellipsis ~50ms)."""
+    words = [(w, a, b) for w, a, b in toks if w[0].isalnum()]
+    hit = next((i for i, (w, _, _) in enumerate(words)
+                if w.lower().startswith(after.lower())), None)
+    if hit is None:
+        raise ValueError(f"pause_after: no token starts with {after!r}")
+    b = words[hit][2]
+    nxt = words[hit + 1][1] if hit + 1 < len(words) else b
+    # a glued trailing ellipsis can make b == the next word's onset, so
+    # cap the cut there — silence lands before the word, never inside it
+    cut = min(b + (nxt - b) * 0.5, nxt, len(audio) / SR)
+    i = int(cut * SR)
+    f = max(int(0.008 * SR), 1)
+    head, tail = audio[:i].copy(), audio[i:].copy()
+    head[-f:] *= np.linspace(1.0, 0.0, f)
+    tail[:f] *= np.linspace(0.0, 1.0, f)
+    out = np.concatenate([head, np.zeros(int(pause * SR), audio.dtype), tail])
+    shifted = [(w, a + (pause if a >= cut else 0.0),
+                e + (pause if e >= cut else 0.0)) for w, a, e in toks]
+    return out, shifted
+
+
 class Timeline:
     def __init__(self, narrator: Narrator, t0: float = 0.6):
         self.n = narrator
@@ -47,8 +73,11 @@ class Timeline:
         self.segs: list[Seg] = []
         self.inks: list[list[list[TimedPoint]]] = []
 
-    def say(self, text: str, gap: float = 0.35, at: float | None = None) -> Seg:
+    def say(self, text: str, gap: float = 0.35, at: float | None = None,
+            pause_after: str | None = None, pause: float = 0.0) -> Seg:
         audio, toks = self.n.say(text)
+        if pause_after and pause > 0.0:
+            audio, toks = _stretch_gap(audio, toks, pause_after, pause)
         seg = Seg(self.t if at is None else at, audio, toks, text)
         self.segs.append(seg)
         self.t = max(self.t, seg.end) + (gap if at is None else 0.0)

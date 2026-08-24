@@ -232,13 +232,18 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     s = tl.say("Quick practice — say them with me.", gap=0.45)
     marks["D"] = s.t0 - 0.4
     cam1(Y_SOLVE, at=s.t0 + 0.1)
-    facts = [("Three times four is twelve.", "twelve", "n12"),
-             ("Four times two is eight.", "eight", "n8"),
-             ("Two times five… ten.", "ten", "n10"),
-             ("Five times six? Thirty.", "Thirty", "n30"),
-             ("And four times seven is twenty-eight.", "twenty", "n28")]
-    for i, ((line, cue, take), blank) in enumerate(zip(facts, fact_bs)):
-        sp = tl.say(line, gap=0.12)
+    # a (word, seconds) breath stretches the silence after that word —
+    # the sentence synthesizes whole, so its melody survives the surgery
+    facts = [("Three times four is twelve.", "twelve", "n12", None),
+             ("Four times two is eight.", "eight", "n8", None),
+             ("Two times five… ten.", "ten", "n10", ("five", 0.55)),
+             ("What's five times six? Thirty.", "Thirty", "n30",
+              ("six", 0.5)),
+             ("And four times seven is twenty-eight.", "twenty", "n28",
+              None)]
+    for i, ((line, cue, take, breath), blank) in enumerate(zip(facts, fact_bs)):
+        kw = dict(pause_after=breath[0], pause=breath[1]) if breath else {}
+        sp = tl.say(line, gap=0.12, **kw)
         end = blank_ink(take, blank, 11, sp.token_start(cue) - 0.1,
                         f"b3.f{i + 1}")
         glow1.add(rect(*DN2_BOXES[i]), sp.t0 + 0.05,
