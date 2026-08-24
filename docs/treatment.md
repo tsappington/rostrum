@@ -49,10 +49,11 @@ times: **volume is a count, not an appearance — area, stacked.**
 - **The glass:** two citizens, both gesture, both orange. The pause
   chip ("you act now") and the wand ("look here") — a dot that pops in,
   hops with each spoken count, double-pulses on the last one like a
-  visual period, and pops out. It exists only while counting, and only
-  over the flat grid, where its position can be honest; beside a
-  foreshortened isometric solid a pointer lies about where the layers
-  are, so there the voice counts alone.
+  visual period, and pops out. The count-along idiom exists only where
+  the wand can point honestly — the flat grid. A metronome count is a
+  pointing gesture in audio; beside a foreshortened isometric solid,
+  where no pointer can truthfully mark the layers, the film doesn't
+  count at all — it just asks and answers.
 - **Sound:** a single close-mic teacher voice (Kokoro-82M, open weights,
   word-timestamped). Room-tone silence between beats — the pauses are
   part of the instruction. No music.

@@ -357,15 +357,12 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     cam2(Y_ROW2, at=s.t0 + 0.2)
     end = cell_ink("n4", 1, "cpl", s.token_start("Four") - 0.1, "gp2.cpl")
     tl.t = max(tl.t, end) + 0.25
-    s = tl.say("Layers? Count them with me:", gap=0.0)
-    lc = count_along(s.end, cad=1.35, lead_gap=0.45)
-    tl.t = max(tl.t, lc[2] + 1.0)
-    # the voice counts this one alone — a wash over the leaning art read
-    # as patchwork, and a wand beside a foreshortened solid lies about
-    # where the layers are; the slow count invites the student to point
-    # at their own sheet
-    end = cell_ink("n3", 1, "lay", lc[2] - 0.05, "gp2.lay")
-    tl.t = max(tl.t, end, lc[2] + 1.0) + 0.25
+    # no count-along here: a metronome count is a pointing gesture in
+    # audio, and nothing on screen can honestly point at the leaning
+    # prism's layers — the idiom appears only where the wand can
+    s = tl.say("How many layers? Three.", gap=0.12)
+    end = cell_ink("n3", 1, "lay", s.token_start("Three") - 0.1, "gp2.lay")
+    tl.t = max(tl.t, end) + 0.25
     s = tl.say("Four times three —", gap=0.12)
     end = cell_ink("n12", 1, "vol", tl.t, "gp2.vol")
     ans = tl.say("Twelve again! A different prism — the same volume.",
