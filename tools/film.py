@@ -40,9 +40,11 @@ DATA = "assets/strokes/capture_ted_v3.json"
 # ---- camera ---------------------------------------------------------------
 VIEW = (536.0, 301.5)
 X1, X2 = 32.0, 37.0
-UNION1 = (X1, 60.0, X1 + VIEW[0], 750.0)
+UNION1 = (X1, 60.0, X1 + VIEW[0], 765.0)
 UNION2 = (X2, 60.0, X2 + VIEW[0], 727.0)
-Y_OPEN, Y_P1, Y_SOLVE, Y_AREA, Y_VOCAB = 64.0, 130.0, 170.0, 215.0, 444.0
+# Y_VOCAB clears the section headline (y 429.8-451.4) completely — a
+# half-cropped "Vocabulary" at the frame top read as a mistake
+Y_OPEN, Y_P1, Y_SOLVE, Y_AREA, Y_VOCAB = 64.0, 130.0, 170.0, 215.0, 455.0
 # page 2 opens on the section itself: "Guided Practice" (y 69-92), its
 # instruction line, the table header, and row 1 share the first frame
 Y_ROW1, Y_ROW2, Y_ROW3, Y_ROW4 = 60.0, 225.0, 340.0, 420.0
@@ -77,16 +79,9 @@ def _row_y(g, i):
 
 
 
-def _grid_rows(g):
-    x0, y0, c, cols, rows = g
-    return [rect(x0, y0 + r * c, x0 + cols * c, y0 + (r + 1) * c)
-            for r in range(rows)]
-
-
-def _grid_cols(g):
-    x0, y0, c, cols, rows = g
-    return [rect(x0 + k * c, y0, x0 + (k + 1) * c, y0 + rows * c)
-            for k in range(cols)]
+def _grid_cell(g, r, k):
+    x0, y0, c, _, _ = g
+    return rect(x0 + k * c, y0 + r * c, x0 + (k + 1) * c, y0 + (r + 1) * c)
 
 
 def build(voice: str = "af_sarah", speed: float = 0.88):
@@ -177,39 +172,39 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
                       "it together.", gap=0.9)
     chips = [(s_pause.token_start("Pause"), s_resume.end + 0.5)]
 
-    # Beat 2 — Do Now problem 1: count the rows out loud, then multiply.
-    # The counts are separate segments spaced by the timeline, not by the
-    # narrator's own prosody — Kokoro rushes an in-sentence count, and a
-    # count-along has to breathe.
-    s = tl.say("Let's check it. Count the rows with me:", gap=0.0)
+    # Beat 2 — Do Now problem 1: count a thing, light a thing. Each
+    # count lights exactly ONE square (a full-row wash read as "which
+    # thing did I just count?"), and the equation writes itself in
+    # tandem: "3" on the third count, "× 4" on the fourth column,
+    # "= 12" at the multiply. Counts are separate segments spaced by
+    # the timeline — the narrator rushes an in-sentence count.
+    s = tl.say("Let's check it.", gap=0.0)
     marks["A"] = s.t0 - 0.4
     cam1(Y_P1, at=s.t0 + 0.2)
-    rows = _grid_rows(DN1)
     counts = count_along(s.end, cad=1.5)
     s = tl.say("Three rows.", at=counts[2] + 1.15, gap=0.5)
-    row_hold = s.end + 0.6
-    for t_c, shape in zip(counts, rows):
-        glow1.add(shape, t_c, row_hold, radius=2)  # cumulative: rows stay lit
-    # the flourish: the last-counted row blinks twice — a visual period
+    row_hold = s.end + 0.5
+    for i, t_c in enumerate(counts):
+        glow1.add(_grid_cell(DN1, i, 0), t_c, row_hold, radius=2)
+    # the flourish: the last-counted square blinks — a visual period
     for tb in (counts[2] + 0.15, counts[2] + 0.55):
-        glow1.add(rows[2], tb, tb + 0.2, fade_in=0.1, fade_out=0.12,
-                  max_alpha=70, radius=2)
+        glow1.add(_grid_cell(DN1, 2, 0), tb, tb + 0.2, fade_in=0.1,
+                  fade_out=0.12, max_alpha=70, radius=2)
     wands.append(Wand(0, [(counts[i], WAND_DN1_X, _row_y(DN1, i))
                           for i in range(3)],
                       t_in=counts[0] - 0.4, t_out=counts[2] + 0.9,
                       flourish=[counts[2] + 0.12]))
-    # …and the columns get the same treatment: count, light, hop
-    s = tl.say("And how many squares in each row? Count with me:", gap=0.0)
-    cols = _grid_cols(DN1)
+    s = tl.say("And how many squares are in each row?", gap=0.0)
     col_counts = count_along(s.end, phrase="One, two, three, four.",
                              cad=1.15, lead_gap=0.45)
-    s = tl.say("Four in each row.", at=col_counts[3] + 1.05, gap=0.4)
+    s = tl.say("Four squares in each row.", at=col_counts[3] + 1.05,
+               gap=0.4)
     col_hold = s.end + 0.5
-    for t_c, shape in zip(col_counts, cols):
-        glow1.add(shape, t_c, col_hold, radius=2)
+    for k, t_c in enumerate(col_counts):
+        glow1.add(_grid_cell(DN1, 0, k), t_c, col_hold, radius=2)
     for tb in (col_counts[3] + 0.15, col_counts[3] + 0.55):
-        glow1.add(cols[3], tb, tb + 0.2, fade_in=0.1, fade_out=0.12,
-                  max_alpha=70, radius=2)
+        glow1.add(_grid_cell(DN1, 0, 3), tb, tb + 0.2, fade_in=0.1,
+                  fade_out=0.12, max_alpha=70, radius=2)
     wands.append(Wand(0, [(col_counts[k], DN1[0] + DN1[2] * (k + 0.5),
                            DN1[1] - 7.0) for k in range(4)],
                       t_in=col_counts[0] - 0.4, t_out=col_counts[3] + 0.9,
@@ -221,8 +216,16 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     glow1.add(rect(g[0], g[1], g[0] + g[3] * g[2], g[1] + g[4] * g[2]),
               s.token_start("multiply"), s.end, max_alpha=60, radius=2)
     eq_t0 = tl.t
-    eq_end = blank_ink("eq", eq_b, 14, eq_t0, "b2.eq", align="left")
-    tl.say("Three times four… is twelve.", at=eq_t0 + 0.45 * (eq_end - eq_t0))
+    st_3, st_x4, st_12 = lib.timed_split(
+        "eq", (eq_b.x0 + 8.0, eq_b.y - 1.2), 14, "b2.eq",
+        stages=[(counts[2] + 0.15, [0]),          # "3"
+                (col_counts[3] + 0.15, [1, 2]),   # "× 4"
+                (eq_t0, [3, 4])],                 # "= 12"
+        clusters=5)
+    tl.ink(st_3)
+    tl.ink(st_x4)
+    eq_end = tl.ink(st_12)
+    tl.say("Three times four… is twelve.", at=max(eq_t0 + 0.2, eq_end - 1.7))
     tl.t = max(tl.t, eq_end) + 0.55
     s = tl.say("Twelve squares in all.", gap=0.0)
     blank_ink("n12", count_b, 12, s.token_start("Twelve") + 0.1, "b2.count")
@@ -230,7 +233,7 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     marks["A_end"] = tl.t
 
     # Beat 3 — the five facts, one varied breath each, boxes warming
-    s = tl.say("Quick practice — say them with me.", gap=0.45)
+    s = tl.say("Quick practice.", gap=0.45)
     marks["D"] = s.t0 - 0.4
     cam1(Y_SOLVE, at=s.t0 + 0.1)
     # a (word, seconds) breath stretches the silence after that word —
@@ -251,42 +254,42 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
                   max(end, sp.end) + 0.2, max_alpha=50, radius=8)
         tl.t = max(end, sp.end) + 0.4
 
-    # Beat 4 — area: the Do Now 1 idiom, abbreviated. Each dimension
-    # lights cumulatively, the full rectangle takes the flourish, the
-    # light releases, and the second dimension answers the first.
-    s = tl.say("One more warm-up: area. This rectangle is five units "
-               "wide…", gap=0.0)
+    # Beat 4 — area: the Do Now 1 idiom, abbreviated. One square lights
+    # per unit — the top edge for "wide", the first column for "high" —
+    # never the whole grid.
+    s = tl.say("One more warm-up: let's find the area of this rectangle. "
+               "It's five units wide…", gap=0.0)
     cam1(Y_AREA, at=s.t0 + 0.2)
-    full3 = rect(DN3[0], DN3[1], DN3[0] + DN3[3] * DN3[2],
-                 DN3[1] + DN3[4] * DN3[2])
     t5 = s.token_start("five")
     glow1.add(rect(*LABEL_5U, pad=2.5), t5, t5 + 1.4, radius=3, max_alpha=75)
     c_last = t5 + 0.15 + 4 * 0.18
-    wide_out = c_last + 1.05
-    for k, sh in enumerate(_grid_cols(DN3)):
-        glow1.add(sh, t5 + 0.15 + k * 0.18, wide_out, radius=2)
-    for tb in (c_last + 0.25, c_last + 0.65):
-        glow1.add(full3, tb, tb + 0.2, fade_in=0.1, fade_out=0.12,
-                  max_alpha=70, radius=2)
+    wide_out = c_last + 1.0
+    for k in range(5):
+        glow1.add(_grid_cell(DN3, 0, k), t5 + 0.15 + k * 0.18, wide_out,
+                  radius=2)
+    for tb in (c_last + 0.2, c_last + 0.55):
+        glow1.add(_grid_cell(DN3, 0, 4), tb, tb + 0.18, fade_in=0.1,
+                  fade_out=0.12, max_alpha=70, radius=2)
     s = tl.say("And two units high.", at=wide_out + 0.4, gap=0.3)
     t2 = s.token_start("two")
     glow1.add(rect(*LABEL_2U, pad=2.5), t2, t2 + 1.4, radius=3, max_alpha=75)
     r_last = t2 + 0.15 + 0.3
-    high_out = r_last + 1.05
-    for k, sh in enumerate(_grid_rows(DN3)):
-        glow1.add(sh, t2 + 0.15 + k * 0.3, high_out, radius=2)
-    for tb in (r_last + 0.25, r_last + 0.65):
-        glow1.add(full3, tb, tb + 0.2, fade_in=0.1, fade_out=0.12,
-                  max_alpha=70, radius=2)
+    high_out = r_last + 1.0
+    for r in range(2):
+        glow1.add(_grid_cell(DN3, r, 0), t2 + 0.15 + r * 0.3, high_out,
+                  radius=2)
+    for tb in (r_last + 0.2, r_last + 0.55):
+        glow1.add(_grid_cell(DN3, 1, 0), tb, tb + 0.18, fade_in=0.1,
+                  fade_out=0.12, max_alpha=70, radius=2)
     tl.t = max(tl.t, high_out + 0.35)
     s = tl.say("Area is width times height. Five times two:", gap=0.25)
     t_ink = tl.t
     end = blank_ink("n10", area_b, 12, t_ink, "b4.area")
     ans = tl.say("Ten square units.", at=max(t_ink + 0.15, end - 0.5))
     tl.t = max(end, ans.end) + 0.5
-    s = tl.say("So area counts the squares that cover a flat shape. Keep "
-               "that idea close — we're about to give it a third dimension.",
-               gap=0.7)
+    s = tl.say("So finding area means counting the squares that cover a "
+               "flat shape. Keep that idea close — we're about to give it "
+               "a third dimension.", gap=0.7)
     marks["D_end"] = tl.t
     cam1(Y_VOCAB, dur=2.2, at=s.t0 + 0.6)
 
@@ -308,8 +311,7 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
                            "settle": 0.4}))
     t_packed = t_pack + (len(slab.cubes) - 1) * 0.16 + 0.32
     tl.t = max(tl.t, t_packed + 0.25)          # let the last cube land
-    tl.say("Twelve cubes fit inside — so its volume is twelve cubic units.",
-           gap=0.45)
+    tl.say("Twelve cubes — so its volume is twelve cubic units.", gap=0.45)
     s3 = tl.say("And a unit cube — a cube one unit long, one unit wide, one "
                 "unit tall. The building block we measure with.", gap=0.4)
     tu = s3.token_start("unit")
@@ -321,7 +323,7 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
                        ("tall", (250, 246, 241))):
         tw = s3.token_start(word)
         glow1.add(faces[tone][:4], tw, tw + 0.75, max_alpha=95, fade_in=0.18)
-    tl.say("That's all volume is. Count the cubes.", gap=0.4)
+    tl.say("That's all volume is.", gap=0.4)
     tl.pause(0.7)
 
     t_cut = tl.t                              # ---- the page turn ----
@@ -401,7 +403,7 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     end = cell_ink("n24", 2, "vol", s.token_start("twenty") - 0.1, "gp3.vol")
     tl.t = max(tl.t, end) + 0.4
     row_glow(glow2, TABLE_ROWS[2], r3_t0, tl.t)
-    tl.say("Volume is area — stacked.", gap=0.8)
+    tl.pause(0.8)
     marks["C_end"] = tl.t
 
     # Beat 9 — row 4, this one's yours
@@ -421,7 +423,8 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     end = cell_ink("n40", 3, "vol", tl.t, "gp4.vol")
     ans = tl.say("Forty cubic units.", at=max(tl.t + 0.1, end - 0.5))
     tl.t = max(end, ans.end) + 0.4
-    s = tl.say("If you wrote forty — you've got volume.", gap=0.6)
+    s = tl.say("If you wrote forty — you've got it correct. The volume is "
+               "forty.", gap=0.6)
     circ_w = lib.width_pt("n40", CELL_CAP, "gp4.vol") * 1.9
     width_fit("mCircle", circ_w,
               (COL_X["vol"] - circ_w / 2, ROW_BASE[3] + 4.5),
@@ -432,8 +435,7 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     # Beat 10 — close
     tl.say("So: cubes per layer, times the number of layers. That's volume — "
            "space, measured in cubic units.", gap=0.35)
-    tl.say("Next lesson, we'll find volume when we can't see every cube. "
-           "See you there.", gap=0.0)
+    tl.say("That completes Lesson 1. Great job, mathematicians!", gap=0.0)
     tl.pause(1.8)
 
     return SimpleNamespace(tl=tl, keys1=keys1, keys2=keys2, t_cut=t_cut,

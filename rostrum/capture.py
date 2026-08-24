@@ -95,6 +95,44 @@ class Library:
         return to_timed(self.data, prompt_id, origin_pt, cap_pt, t0=t0,
                         take=take, variant_seed=h, **kw)
 
+    def timed_split(self, prompt_id: str, origin_pt: tuple[float, float],
+                    cap_pt: float, event_key: str,
+                    stages: list[tuple[float, list[int]]],
+                    clusters: int) -> list[list[list[TimedPoint]]]:
+        """Replay one take in directed stages — a multi-glyph capture
+        (like "3×4=12") written a few glyphs at a time, as a teacher
+        builds an equation while she talks.
+
+        The take is placed whole, exactly as `timed` would place it, so
+        every glyph keeps its captured position; then its strokes
+        cluster into `clusters` glyphs by the widest x-gaps (a take is
+        written left to right, and strokes of one glyph overlap in x
+        while glyphs don't). Each stage (t0, glyph indices) replays its
+        glyphs starting at t0 with the take's own internal pacing.
+        Returns the timed strokes per stage, ready for Timeline.ink.
+        """
+        timed = self.timed(prompt_id, origin_pt, cap_pt, 0.0, event_key)
+        order = sorted(range(len(timed)),
+                       key=lambda i: min(p.x for p in timed[i]))
+        ext = [(min(p.x for p in timed[i]), max(p.x for p in timed[i]))
+               for i in order]
+        cuts = sorted(sorted(range(len(order) - 1),
+                             key=lambda i: ext[i + 1][0] - ext[i][1],
+                             reverse=True)[:clusters - 1])
+        glyphs, start = [], 0
+        for c in cuts:
+            glyphs.append([timed[i] for i in order[start:c + 1]])
+            start = c + 1
+        glyphs.append([timed[i] for i in order[start:]])
+        assert all(glyphs), f"{prompt_id}: empty glyph cluster"
+        out = []
+        for t0, idxs in stages:
+            strokes = [s for gi in idxs for s in glyphs[gi]]
+            base = min(p.t for s in strokes for p in s)
+            out.append([[TimedPoint(p.t - base + t0, p.x, p.y, p.p)
+                         for p in s] for s in strokes])
+        return out
+
 
 def _fit(take: dict, data: dict, cap_pt: float) -> tuple[float, float]:
     """Scale and baseline for a take: measured from its own ink.

@@ -34,10 +34,17 @@ times: **volume is a count, not an appearance — area, stacked.**
   artwork, never floating chrome.
 - **Light:** the highlight wash is the ink's own blue — the teacher's
   attention in the teacher's color, and legible where a warm wash
-  disappears into warm paper. It sweeps rows as she counts (cumulative:
-  three lit rows *are* "three rows"), warms the active fact box, lifts
-  labels and terms, and picks out the unit cube's faces on
-  "long / wide / tall". Orange belongs to the glass alone.
+  disappears into warm paper. Counting lights exactly ONE square per
+  spoken count (count a thing, light a thing — a full-row wash reads
+  as "which thing did I just count?"), cumulatively, so three lit
+  squares down a column *are* "three rows". The wash also warms the
+  active fact box, lifts labels and terms, and picks out the unit
+  cube's faces on "long / wide / tall". Orange belongs to the glass
+  alone.
+- **The equation writes itself in tandem:** the captured "3×4=12" take
+  replays in stages — "3" lands on the third count, "× 4" on the
+  fourth column, "= 12" at the multiply — split at the take's own
+  glyph gaps, so the equation builds with the count that proves it.
 - **Figures (arrival-only):** the illustration panels are the one place
   the page comes alive, and their grammar is a single verb — *arrive*.
   The vocabulary box starts blank and cubes pack it as she says
@@ -161,6 +168,13 @@ when we *can't* see every cube. See you there."
   screencast's pen-nib pointer. A nib that rides the ink full-time
   remains a rendering flag if MCP wants it.
 - **Music bed** — rejected: silence is where a 6th grader thinks.
+- **Prism 1 → Prism 2 rotation** (screening suggestion) — the right
+  visual for "different prism, same volume": prism 2's print fades,
+  prism 1 appears and rotates upright into prism 2's exact pose. Parked
+  because a true rotation needs a small 3-D re-projection of the page's
+  isometric convention — the first film element not derived directly
+  from the page's own 2-D art (endpoints would still register to
+  print). Designed, estimated, and deferred under the deadline.
 - **Fade transitions on figures** — tried (v2), rejected in screening:
   a viewer reads fade-out as "what just happened?"; replaced by the
   arrival-only grammar above.
