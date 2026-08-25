@@ -3,10 +3,21 @@
 Renders at 2x supersample and downscales per frame, which keeps the ink
 edges clean without a vector compositor. The ffmpeg binary comes bundled
 with imageio-ffmpeg, so the pipeline has no system dependencies.
+
+Sound leaves here at a broadcast loudness, not a peak. A mix normalized
+to its loudest sample can still be far too quiet to sit beside the other
+things a student watches — this one measured -23 LUFS, roughly 9 dB under
+what a streaming platform expects — and quiet instruction gets turned up,
+not leaned into. `normalize_loudness` runs the two-pass ITU-R BS.1770
+measurement ffmpeg already implements: measure the whole programme, then
+apply one gain, so the teacher's dynamics survive and only the level
+moves.
 """
 
 from __future__ import annotations
 
+import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -118,6 +129,63 @@ def write_video(path: str | Path, frames, fps: int = 60, size=(1920, 1080)) -> P
     if proc.returncode != 0:
         raise RuntimeError(f"ffmpeg exited {proc.returncode}")
     return path
+
+
+# -14 LUFS with 1.5 dB of true-peak headroom is where the streaming
+# platforms land; 7 LU of range keeps a teacher's quiet aside quiet.
+TARGET_I, TARGET_TP, TARGET_LRA = -14.0, -1.5, 7.0
+
+
+def _ffmpeg(args: list[str]) -> str:
+    """Run ffmpeg and hand back stderr — where it says everything."""
+    proc = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), *args],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                          text=True)
+    if proc.returncode != 0:
+        tail = "\n".join(proc.stderr.strip().splitlines()[-12:])
+        raise RuntimeError(f"ffmpeg exited {proc.returncode}:\n{tail}")
+    return proc.stderr
+
+
+def normalize_loudness(src: str | Path, dst: str | Path, sample_rate: int,
+                       target_i: float = TARGET_I, target_tp: float = TARGET_TP,
+                       target_lra: float = TARGET_LRA) -> dict:
+    """Bring a finished mix to a loudness target. Returns the measurement.
+
+    Two passes, because one can't be right: the first measures the whole
+    programme (integrated loudness, range, true peak, gate threshold),
+    the second applies those numbers in one informed correction.
+    Measuring and correcting in a single streaming pass would ride the
+    level against the narration itself — exactly the pumping a lesson
+    can't afford.
+
+    `linear=true` asks for a plain gain and no processing at all. It is a
+    request, not a guarantee: this narration measures -23 LUFS with peaks
+    already at -1.6 dBTP — unprocessed speech runs a wide crest, and the
+    hot samples are spread across the whole film rather than sitting in
+    one fixable transient — so the straight +9 dB to reach target would
+    breach the ceiling, and ffmpeg falls back to a limited correction
+    that lands near -15.5 LUFS. That is the right trade: the ceiling
+    wins, loudness range comes through intact (3.8 → 4.6 LU, nothing
+    squashed), and the caller prints what was actually achieved rather
+    than what was asked for.
+    """
+    spec = f"I={target_i}:TP={target_tp}:LRA={target_lra}"
+    log = _ffmpeg(["-i", str(src), "-af", f"loudnorm={spec}:print_format=json",
+                   "-f", "null", "-"])
+    blocks = re.findall(r"\{[^{}]*\}", log, re.S)
+    if not blocks:
+        raise RuntimeError(f"loudnorm reported no measurement:\n{log[-800:]}")
+    m = json.loads(blocks[-1])
+    _ffmpeg([
+        "-y", "-i", str(src),
+        "-af", f"loudnorm={spec}"
+               f":measured_I={m['input_i']}:measured_TP={m['input_tp']}"
+               f":measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}"
+               f":offset={m['target_offset']}:linear=true",
+        "-ar", str(sample_rate), str(dst),
+    ])
+    return m
 
 
 def mux(video: str | Path, audio_wav: str | Path, out: str | Path) -> Path:

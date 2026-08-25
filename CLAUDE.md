@@ -15,7 +15,8 @@ changing what the film *does*.
 ## Commands
 
 ```
-python -m tools.film schedule           # timing map, no render (spec checks run)
+python -m rostrum.verify                # the gate alone: spec vs page vs art
+python -m tools.film schedule           # timing map, no render (gate runs first)
 python -m tools.film                    # full render → out/volume_cubes_*.mp4 + .srt
 python -m tools.film audio af_sarah     # narration track only (fast; no frames)
 python -m tools.slice                   # Beats 2-3 vertical slice (reference impl)
@@ -29,7 +30,8 @@ lines.
 
 - `lesson/volume_cubes.yaml` — the content source of truth; every number
   written on screen carries a machine-checkable expression
-- `rostrum/` — the package: `page` (PDF plates + geometry), `capture`
+- `rostrum/` — the package: `verify` (the gate), `page` (PDF plates +
+  geometry), `capture`
   (stroke ingestion, take Library, micro-humanization), `ink`
   (timing/pressure/render), `tts`, `timeline`, `render` (cameras, mux),
   `chip` (the glass layer), `brand` (tokens from the worksheet's own
@@ -47,9 +49,16 @@ lines.
   (`capture.Library`).
 - **Never hand-edit `assets/strokes/*.json`.** That's captured human
   data with provenance; corrections belong in ingestion code.
-- **Verification precedes rendering.** A number that appears on screen
-  must exist in the lesson spec with a passing `check`. If a check
-  fails, the build must fail.
+- **Verification precedes rendering.** `rostrum.verify` runs before any
+  audio or any frame exists, and the build dies there. Three loops close:
+  every spec `check` is evaluated symbolically against that item's own
+  measurements (never a tautology — `L * D * H == 24`, not `2 == 2`); the
+  printed page is re-read and must agree; and the illustrations are
+  counted out of the PDF's vector data, so `volume` has a witness that
+  was never derived from the arithmetic it confirms. The film never names
+  a number itself — it asks `Spec.take()`, and `assert_written` confirms
+  at wrap that every declared answer went down exactly once. A number no
+  source can prove does not reach a frame.
 - **Two layers only.** The paper (worksheet + ink) and the glass
   (captions, pause chip, wand). Nothing else ever goes on the glass;
   nothing synthetic goes on the paper except ink and the page's own

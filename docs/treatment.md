@@ -68,8 +68,10 @@ times: **volume is a count, not an appearance — area, stacked.**
   narration ≈145 wpm with real pauses; two explicit Modern
   Classrooms-style pause-and-try prompts (Do Now, and Practice 4 as
   "this one's yours").
-- **Captions:** word-timed SRT/VTT emitted from the same timing map that
-  drives the ink.
+- **Captions:** an SRT emitted from the same timing map that drives the
+  ink — one cue per spoken line, so the caption and the pen change
+  together. (Kokoro's word timestamps would support word-level cues too;
+  not emitted.)
 
 ## Beat sheet
 
@@ -95,7 +97,8 @@ words on answers; connective reasoning modeled on the strongest
 exemplar screencast). `python -m tools.film schedule` prints it with
 live timings. v0 below is kept as the record of the first draft.
 
-All numbers below are verified by `lesson/volume_cubes.yaml` checks.
+All numbers below are verified by `rostrum.verify` against
+`lesson/volume_cubes.yaml`, the printed page, and the page's own artwork.
 `[INK: …]` marks writing; `[MARK: …]` marks annotation on the page art.
 
 **0 — Cold open.** "Hi mathematicians — welcome back. Today we're

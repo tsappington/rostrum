@@ -1,7 +1,26 @@
 # Lesson spec — the canonical, machine-readable source the pipeline consumes.
-# Content transcribed from the MCP guided notes (assets/guided_notes.pdf);
-# every `answer` below carries a `check` expression the verifier asserts
-# before any frame renders. If a check fails, the build fails.
+# Content transcribed from the MCP guided notes (assets/guided_notes.pdf).
+#
+# Nothing here is taken on trust. `rostrum.verify` runs before any frame or
+# any second of audio exists, and it closes the loop three ways:
+#
+#   spec → arithmetic   every `check` is evaluated symbolically, in a
+#                       namespace bound from this item's own measurements
+#                       (R,C for a grid; A,B for a fact; L,D,H for a prism),
+#                       so no check can be a tautology — a wrong dimension
+#                       fails, not just wrong arithmetic
+#   spec → the document the printed page is re-read and must agree: the five
+#                       multiplication prompts, the vocabulary terms, their
+#                       definitions and examples, the lesson objective
+#   spec → the artwork  the illustrations are counted from the PDF's own
+#                       vector data — squares in the flat grids, cube triples
+#                       in the isometric figures — and must equal what this
+#                       file claims. The artist drew every cube, hidden ones
+#                       included, so `volume` has an independent witness.
+#
+# `write` is what the teacher's hand puts on screen; `take` is the captured
+# handwriting that writes it. The film never names a number itself — it asks
+# this file, so a number that reaches a frame has passed all three loops.
 
 meta:
   title: Volume with Whole-Number Cubes
@@ -20,27 +39,33 @@ do_now:
     prompt: >-
       Consider an array of 3 rows of 4 squares. How many squares are there
       in all? Write a multiplication equation to show your thinking.
+    grid: [3, 4]                 # R rows, C columns — counted in the page's art
     ink:
       - field: equation
         write: "3 × 4 = 12"
-        check: "3 * 4 == 12"
+        take: eq
+        check: "R * C == 12"
       - field: count
         write: "12"
-        check: "3 * 4 == 12"
+        take: n12
+        check: "R * C == 12"
   - id: dn2
     prompt: Solve.
+    # `fact` is the printed prompt itself — "3 × 4 =" — re-read from the page
     ink:
-      - { field: fact1, write: "12", check: "3 * 4 == 12" }
-      - { field: fact2, write: "8",  check: "4 * 2 == 8" }
-      - { field: fact3, write: "10", check: "2 * 5 == 10" }
-      - { field: fact4, write: "30", check: "5 * 6 == 30" }
-      - { field: fact5, write: "28", check: "4 * 7 == 28" }
+      - { field: fact1, fact: [3, 4], write: "12", take: n12, check: "A * B == 12" }
+      - { field: fact2, fact: [4, 2], write: "8",  take: n8,  check: "A * B == 8" }
+      - { field: fact3, fact: [2, 5], write: "10", take: n10, check: "A * B == 10" }
+      - { field: fact4, fact: [5, 6], write: "30", take: n30, check: "A * B == 30" }
+      - { field: fact5, fact: [4, 7], write: "28", take: n28, check: "A * B == 28" }
   - id: dn3
     prompt: Find the area of a rectangle that is 5 units by 2 units.
+    grid: [2, 5]                 # 2 units high, 5 units wide — as labelled
     ink:
       - field: area
         write: "10"
-        check: "5 * 2 == 10"
+        take: n10
+        check: "R * C == 10"
 
 vocabulary:
   - term: Volume
@@ -48,6 +73,7 @@ vocabulary:
       The amount of space a solid figure takes up, measured in cubic units.
     example: >-
       A box packed with 12 one-inch unit cubes has a volume of 12 cubic units.
+    example_cubes: 12            # and the panel's art must contain exactly 12
   - term: Unit Cube
     definition: >-
       A cube that is 1 unit long, 1 unit wide, and 1 unit tall — the building
@@ -55,35 +81,37 @@ vocabulary:
     example: >-
       A cube measuring 1 inch on every side is a unit cube. Many unit cubes
       packed together fill a larger box.
+    example_cubes: 1
 
 guided_practice:
   # Table columns: Cubes per Layer | Number of Layers | Volume (cubic units)
-  # Prism dims below are (length, depth, height) read from the isometric art.
+  # dims are (L, D, H) — length, depth, height — read from the isometric art
+  # and independently witnessed by the cube count in that art.
   - id: gp1
     dims: [4, 3, 1]
     ink:
-      - { field: cubes_per_layer, write: "12", check: "4 * 3 == 12" }
-      - { field: num_layers,      write: "1",  check: "1 == 1" }
-      - { field: volume,          write: "12", check: "4 * 3 * 1 == 12" }
+      - { field: cubes_per_layer, write: "12", take: n12, check: "L * D == 12" }
+      - { field: num_layers,      write: "1",  take: n1,  check: "H == 1" }
+      - { field: volume,          write: "12", take: n12, check: "L * D * H == 12" }
     note: One layer — volume equals the Do Now's area count. The 2D→3D bridge.
   - id: gp2
     dims: [4, 1, 3]
     ink:
-      - { field: cubes_per_layer, write: "4",  check: "4 * 1 == 4" }
-      - { field: num_layers,      write: "3",  check: "3 == 3" }
-      - { field: volume,          write: "12", check: "4 * 1 * 3 == 12" }
+      - { field: cubes_per_layer, write: "4",  take: n4,  check: "L * D == 4" }
+      - { field: num_layers,      write: "3",  take: n3,  check: "H == 3" }
+      - { field: volume,          write: "12", take: n12, check: "L * D * H == 12" }
     note: Different shape, same 12 — volume is a count, not an appearance.
   - id: gp3
     dims: [4, 3, 2]
     ink:
-      - { field: cubes_per_layer, write: "12", check: "4 * 3 == 12" }
-      - { field: num_layers,      write: "2",  check: "2 == 2" }
-      - { field: volume,          write: "24", check: "4 * 3 * 2 == 24" }
+      - { field: cubes_per_layer, write: "12", take: n12, check: "L * D == 12" }
+      - { field: num_layers,      write: "2",  take: n2,  check: "H == 2" }
+      - { field: volume,          write: "24", take: n24, check: "L * D * H == 24" }
     note: Problem 1 with a second layer stacked — volume is area, stacked.
   - id: gp4
     dims: [5, 4, 2]
     ink:
-      - { field: cubes_per_layer, write: "20", check: "5 * 4 == 20" }
-      - { field: num_layers,      write: "2",  check: "2 == 2" }
-      - { field: volume,          write: "40", check: "5 * 4 * 2 == 40" }
+      - { field: cubes_per_layer, write: "20", take: n20, check: "L * D == 20" }
+      - { field: num_layers,      write: "2",  take: n2,  check: "H == 2" }
+      - { field: volume,          write: "40", take: n40, check: "L * D * H == 40" }
     note: Bigger footprint, same method — generalize with confidence.

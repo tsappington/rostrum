@@ -110,7 +110,8 @@ sync would have needed a separate forced-alignment stage.)
 
 ```
 lesson spec (YAML, machine-checkable answers)
-  └─ verify     every answer asserted before any frame renders
+  └─ verify     65 checks — arithmetic, printed page, printed artwork —
+                before any audio or any frame exists
   └─ narrate    Kokoro-82M → audio + word timestamps (cached per line)
   └─ timeline   one clock: narration, ink cues, light, camera, captions
   └─ geometry   blanks, tables, figures — read from the PDF's vectors
@@ -134,9 +135,34 @@ never re-synthesizes; a one-line script edit re-voices one line.
 
 ## Verification
 
-- 20 machine-checkable assertions in the lesson spec — every number
-  written on screen is verified (`3 * 4 == 12`) before render; a
-  failing check fails the build.
+- **65 checks run before a single second of audio exists**, and the
+  build dies there if any fails (`python -m rostrum.verify`). They close
+  three loops:
+  - **Arithmetic (20).** Every spec `check` is evaluated symbolically —
+    a small AST walker over a whitelist, not `eval` — in a namespace
+    bound from that item's own measurements. `L * D * H == 24` against
+    `dims: [4, 3, 2]` is a real claim; the `2 == 2` it replaced was not.
+  - **The printed page (8).** The document is re-read and has to agree:
+    the lesson title, the five multiplication prompts in order, both
+    vocabulary terms, the rectangle's own "5 units"/"2 units" labels,
+    and the practice table's column headers in the order the film fills
+    them. (The serif body copy is outlined vector, so the definitions
+    have no string to compare against — the spec carries them as content
+    and claims nothing it can't keep.)
+  - **The printed artwork (17).** The illustrations are counted straight
+    out of the PDF's vector data — squares in the flat grids, cube-face
+    triples in the isometric solids. The artist drew every cube,
+    occluded ones included, so each prism's volume has a witness that
+    was never derived from the arithmetic it confirms: 12, 12, 24, 40.
+    The grids are checked for *shape*, not just total — the narration
+    says "three rows" and "four in each row", so the art has to be 3×4.
+  This is what catches the failure that arithmetic alone can't: misread
+  a dimension off an isometric drawing and every equation still balances.
+  Change `gp3` to 4×3×3 and the checks pass — until the artwork says 24
+  cubes and the build stops.
+- **The film never names a number.** Every answer on screen comes from
+  `Spec.take()`, and `assert_written` confirms at wrap that each declared
+  answer was written exactly once and nothing else was.
 - Determinism proven cross-platform: the same commit produced
   digit-identical timing maps on an Apple-silicon Mac and an x86 Linux
   container.
@@ -156,7 +182,7 @@ never re-synthesizes; a one-line script edit re-voices one line.
 | **PyMuPDF** | vector-true plates, page geometry, figure extraction |
 | **Pillow + NumPy** | ink and light rendering, compositing, audio assembly |
 | **ffmpeg** (bundled via imageio-ffmpeg) | H.264 encode + AAC mux |
-| **PyYAML** | the machine-checkable lesson spec |
+| **PyYAML** | the machine-checkable lesson spec — the gate's input |
 | **Python 3.12** | everything; single-process by choice |
 | **rostrum ink capture** (built for this) | iPad + Apple Pencil stroke recorder (PointerEvents, pressure, timing) |
 | **Claude Code** | AI pair across the whole build — architecture, implementation, and the revision loop against my screening notes |
@@ -195,6 +221,14 @@ story.*
   machine-checkable.** Math is. Other subjects need their own check
   types (spelling against a dictionary, dates against a source);
   where content can't be asserted, the gate thins to human review.
+- **Loudness is capped by the crest, not by choice.** The mix is
+  normalized to a broadcast target (two-pass ITU-R BS.1770) rather than
+  to a peak, which took it from -23.2 to -15.5 LUFS. It doesn't reach
+  -14: unprocessed TTS speech runs a wide crest with hot samples spread
+  across the whole film, so the straight +9 dB would breach the
+  true-peak ceiling. The ceiling wins, loudness range comes through
+  intact (3.8 → 4.6 LU), and every render prints what it actually
+  achieved rather than what it asked for.
 - **Pencil pressure through Safari** arrives uncalibrated; each
   writer's personal range is normalized into the ink model's dynamic
   range — relative dynamics preserved, absolute weight standardized.
@@ -210,8 +244,10 @@ digits and operators for every math lesson; a new glyph costs minutes
 on the iPad. The voice is synthesized. Plates come free from any
 vector PDF. Captions are a by-product.
 
-**QA: scales because of determinism.** Checks run before frames
+**QA: scales because of determinism.** 65 checks run before frames
 exist; same input, same film; reviewing the spec reviews the video.
+Two of the three loops — the printed page and its artwork — need no
+per-lesson authoring at all: they read whatever PDF they're given.
 There is no hallucination surface to audit.
 
 **Authoring: the honest bottleneck.** Today this is a film crew, not

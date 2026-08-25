@@ -31,9 +31,11 @@ from rostrum.chip import Wand
 from rostrum.figures import Figure
 from rostrum.glow import GlowTrack, rect
 from rostrum.page import find_blanks
-from rostrum.render import MovingRostrum, mux, write_video
+from rostrum.render import (MovingRostrum, mux, normalize_loudness,
+                            write_video)
 from rostrum.timeline import Seg, Timeline
 from rostrum.tts import SR, Narrator
+from rostrum.verify import verify
 
 DATA = "assets/strokes/capture_ted_v3.json"
 
@@ -50,7 +52,9 @@ Y_OPEN, Y_P1, Y_SOLVE, Y_AREA, Y_VOCAB = 64.0, 130.0, 170.0, 215.0, 455.0
 Y_ROW1, Y_ROW2, Y_ROW3, Y_ROW4 = 60.0, 225.0, 340.0, 420.0
 
 # ---- page geometry (from the PDF's own vector data) -----------------------
-COL_X = {"cpl": 306.0, "lay": 412.5, "vol": 519.0}
+# keyed by the spec's own field names; verify asserts this order against
+# the printed table headers
+COL_X = {"cubes_per_layer": 306.0, "num_layers": 412.5, "volume": 519.0}
 ROW_BASE = [230.75, 356.85, 482.95, 609.05]
 CELL_CAP = 13.0
 TABLE_ROWS = [(161.2, 287.3), (287.3, 413.4), (413.4, 539.5), (539.5, 665.6)]
@@ -86,10 +90,29 @@ def _grid_cell(g, r, k):
 
 def build(voice: str = "af_sarah", speed: float = 0.88):
     D = capture.load(DATA)
+    # the gate, before a single second of audio exists: the lesson's
+    # arithmetic, the printed page, its artwork, and the capture library
+    # all have to agree before this film is allowed to name a number
+    spec = verify(strokes=D)
     lib = capture.Library(D)
     tl = Timeline(Narrator(voice, speed))
     bs = find_blanks(0)
+    # ink lands on real geometry, so the geometry gets an assertion too:
+    # if the plate ever moves, this fails loudly instead of writing into
+    # the margin (the reference slice has always carried this guard)
+    assert len(bs) == 10 and abs(bs[2].y - 228.4) < 1 \
+        and abs(bs[4].y - 287.6) < 1, "page 1 layout moved"
     eq_b, count_b, fact_bs, area_b = bs[2], bs[3], bs[4:9], bs[9]
+
+    written: list[str] = []
+
+    def take(addr: str) -> str:
+        """The captured hand that writes one verified spec answer. The
+        shooting script never names a number itself — it asks the spec,
+        and every ask is recorded so `assert_written` can confirm at wrap
+        that each declared answer went down exactly once."""
+        written.append(addr)
+        return spec.take(addr)
 
     keys1 = [(0.0, X1, Y_OPEN)]
     keys2: list[tuple[float, float, float]] = []
@@ -111,14 +134,17 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
         keys2.append((t + dur, X2, y))
         return t + dur
 
-    def blank_ink(prompt, blank, cap, t0, key, align="center"):
+    def blank_ink(addr, blank, cap, t0, key, align="center"):
+        prompt = take(addr)
         w = lib.width_pt(prompt, cap, key)
         x = blank.x0 + 8.0 if align == "left" else blank.x0 + (blank.width - w) / 2
         return tl.ink(lib.timed(prompt, (x, blank.y - 1.2), cap, t0, key))
 
-    def cell_ink(prompt, row, col, t0, key):
+    def cell_ink(addr, row, t0, key):
+        prompt = take(addr)
+        x = COL_X[addr.split(".")[1]]
         w = lib.width_pt(prompt, CELL_CAP, key)
-        return tl.ink(lib.timed(prompt, (COL_X[col] - w / 2, ROW_BASE[row]),
+        return tl.ink(lib.timed(prompt, (x - w / 2, ROW_BASE[row]),
                                 CELL_CAP, t0, key))
 
     def width_fit(prompt, target_w, origin, t0, key):
@@ -217,7 +243,7 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
               s.token_start("multiply"), s.end, max_alpha=60, radius=2)
     eq_t0 = tl.t
     st_3, st_x4, st_12 = lib.timed_split(
-        "eq", (eq_b.x0 + 8.0, eq_b.y - 1.2), 14, "b2.eq",
+        take("dn1.equation"), (eq_b.x0 + 8.0, eq_b.y - 1.2), 14, "b2.eq",
         stages=[(counts[2] + 0.15, [0]),          # "3"
                 (col_counts[3] + 0.15, [1, 2]),   # "× 4"
                 (eq_t0, [3, 4])],                 # "= 12"
@@ -228,7 +254,8 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     tl.say("Three times four… is twelve.", at=max(eq_t0 + 0.2, eq_end - 1.7))
     tl.t = max(tl.t, eq_end) + 0.55
     s = tl.say("Twelve squares in all.", gap=0.0)
-    blank_ink("n12", count_b, 12, s.token_start("Twelve") + 0.1, "b2.count")
+    blank_ink("dn1.count", count_b, 12,
+              s.token_start("Twelve") + 0.1, "b2.count")
     tl.pause(0.7)
     marks["A_end"] = tl.t
 
@@ -238,17 +265,17 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     cam1(Y_SOLVE, at=s.t0 + 0.1)
     # a (word, seconds) breath stretches the silence after that word —
     # the sentence synthesizes whole, so its melody survives the surgery
-    facts = [("Three times four is twelve.", "twelve", "n12", None),
-             ("Four times two is eight.", "eight", "n8", None),
-             ("Two times five… ten.", "ten", "n10", ("five", 0.55)),
-             ("What's five times six? Thirty.", "Thirty", "n30",
+    facts = [("Three times four is twelve.", "twelve", "dn2.fact1", None),
+             ("Four times two is eight.", "eight", "dn2.fact2", None),
+             ("Two times five… ten.", "ten", "dn2.fact3", ("five", 0.55)),
+             ("What's five times six? Thirty.", "Thirty", "dn2.fact4",
               ("six", 0.5)),
-             ("And four times seven is twenty-eight.", "twenty", "n28",
-              None)]
-    for i, ((line, cue, take, breath), blank) in enumerate(zip(facts, fact_bs)):
+             ("And four times seven is twenty-eight.", "twenty",
+              "dn2.fact5", None)]
+    for i, ((line, cue, addr, breath), blank) in enumerate(zip(facts, fact_bs)):
         kw = dict(pause_after=breath[0], pause=breath[1]) if breath else {}
         sp = tl.say(line, gap=0.12, **kw)
-        end = blank_ink(take, blank, 11, sp.token_start(cue) - 0.1,
+        end = blank_ink(addr, blank, 11, sp.token_start(cue) - 0.1,
                         f"b3.f{i + 1}")
         glow1.add(rect(*DN2_BOXES[i]), sp.t0 + 0.05,
                   max(end, sp.end) + 0.2, max_alpha=50, radius=8)
@@ -284,7 +311,7 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     tl.t = max(tl.t, high_out + 0.35)
     s = tl.say("Area is width times height. Five times two:", gap=0.25)
     t_ink = tl.t
-    end = blank_ink("n10", area_b, 12, t_ink, "b4.area")
+    end = blank_ink("dn3.area", area_b, 12, t_ink, "b4.area")
     ans = tl.say("Ten square units.", at=max(t_ink + 0.15, end - 0.5))
     tl.t = max(end, ans.end) + 0.5
     s = tl.say("So finding area means counting the squares that cover a "
@@ -337,13 +364,14 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     s = tl.say("Prism one. How many cubes in one layer? Count the top with "
                "me — four rows of three… is twelve.", gap=0.15)
     r1_t0 = s.t0
-    cell_ink("n12", 0, "cpl", s.token_start("twelve") - 0.15, "gp1.cpl")
+    cell_ink("gp1.cubes_per_layer", 0, s.token_start("twelve") - 0.15,
+             "gp1.cpl")
     tl.pause(0.25)
     s = tl.say("How many layers? Just one.", gap=0.1)
-    end = cell_ink("n1", 0, "lay", s.token_start("one") - 0.1, "gp1.lay")
+    end = cell_ink("gp1.num_layers", 0, s.token_start("one") - 0.1, "gp1.lay")
     tl.t = max(tl.t, end) + 0.25
     s = tl.say("So the volume: twelve times one —", gap=0.12)
-    end = cell_ink("n12", 0, "vol", tl.t, "gp1.vol")
+    end = cell_ink("gp1.volume", 0, tl.t, "gp1.vol")
     ans = tl.say("Twelve cubic units.", at=max(tl.t + 0.1, end - 0.6))
     tl.t = max(end, ans.end) + 0.35
     row_glow(glow2, TABLE_ROWS[0], r1_t0, tl.t)
@@ -357,16 +385,18 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     r2_t0 = s.t0
     marks["C"] = s.t0 - 0.4
     cam2(Y_ROW2, at=s.t0 + 0.2)
-    end = cell_ink("n4", 1, "cpl", s.token_start("Four") - 0.1, "gp2.cpl")
+    end = cell_ink("gp2.cubes_per_layer", 1, s.token_start("Four") - 0.1,
+                   "gp2.cpl")
     tl.t = max(tl.t, end) + 0.25
     # no count-along here: a metronome count is a pointing gesture in
     # audio, and nothing on screen can honestly point at the leaning
     # prism's layers — the idiom appears only where the wand can
     s = tl.say("How many layers? Three.", gap=0.12)
-    end = cell_ink("n3", 1, "lay", s.token_start("Three") - 0.1, "gp2.lay")
+    end = cell_ink("gp2.num_layers", 1, s.token_start("Three") - 0.1,
+                   "gp2.lay")
     tl.t = max(tl.t, end) + 0.25
     s = tl.say("Four times three —", gap=0.12)
-    end = cell_ink("n12", 1, "vol", tl.t, "gp2.vol")
+    end = cell_ink("gp2.volume", 1, tl.t, "gp2.vol")
     ans = tl.say("Twelve again! A different prism — the same volume.",
                  at=max(tl.t + 0.1, end - 0.4))
     tl.t = max(end, ans.end) + 0.3
@@ -394,13 +424,14 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
                                        {"t0": t_stack, "idx": top,
                                         "dur": 0.9, "drop_h": 22.0}]}))
     s = tl.say("We already counted this layer — twelve cubes.", gap=0.12)
-    end = cell_ink("n12", 2, "cpl", s.token_start("twelve") + 0.1, "gp3.cpl")
+    end = cell_ink("gp3.cubes_per_layer", 2, s.token_start("twelve") + 0.1,
+                   "gp3.cpl")
     tl.t = max(tl.t, end) + 0.25
     s = tl.say("Now there are two layers.", gap=0.12)
-    end = cell_ink("n2", 2, "lay", s.token_start("two") + 0.1, "gp3.lay")
+    end = cell_ink("gp3.num_layers", 2, s.token_start("two") + 0.1, "gp3.lay")
     tl.t = max(tl.t, end) + 0.3
     s = tl.say("Twelve times two — twenty-four cubic units.", gap=0.12)
-    end = cell_ink("n24", 2, "vol", s.token_start("twenty") - 0.1, "gp3.vol")
+    end = cell_ink("gp3.volume", 2, s.token_start("twenty") - 0.1, "gp3.vol")
     tl.t = max(tl.t, end) + 0.4
     row_glow(glow2, TABLE_ROWS[2], r3_t0, tl.t)
     tl.pause(0.8)
@@ -414,20 +445,21 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     s = tl.say("Ready? Check it with me. Five by four — twenty cubes in a "
                "layer.", gap=0.15)
     chips.append((s9.token_start("Pause"), s.t0 - 0.15))
-    end = cell_ink("n20", 3, "cpl", s.token_start("twenty") - 0.1, "gp4.cpl")
+    end = cell_ink("gp4.cubes_per_layer", 3, s.token_start("twenty") - 0.1,
+                   "gp4.cpl")
     tl.t = max(tl.t, end) + 0.25
     s = tl.say("Two layers.", gap=0.12)
-    end = cell_ink("n2", 3, "lay", s.token_start("Two") + 0.1, "gp4.lay")
+    end = cell_ink("gp4.num_layers", 3, s.token_start("Two") + 0.1, "gp4.lay")
     tl.t = max(tl.t, end) + 0.3
     s = tl.say("Twenty times two —", gap=0.12)
-    end = cell_ink("n40", 3, "vol", tl.t, "gp4.vol")
+    end = cell_ink("gp4.volume", 3, tl.t, "gp4.vol")
     ans = tl.say("Forty cubic units.", at=max(tl.t + 0.1, end - 0.5))
     tl.t = max(end, ans.end) + 0.4
     s = tl.say("If you wrote forty — you've got it correct. The volume is "
                "forty.", gap=0.6)
-    circ_w = lib.width_pt("n40", CELL_CAP, "gp4.vol") * 1.9
+    circ_w = lib.width_pt(spec.take("gp4.volume"), CELL_CAP, "gp4.vol") * 1.9
     width_fit("mCircle", circ_w,
-              (COL_X["vol"] - circ_w / 2, ROW_BASE[3] + 4.5),
+              (COL_X["volume"] - circ_w / 2, ROW_BASE[3] + 4.5),
               s.token_start("you've") - 0.1, "gp4.circle")
     row_glow(glow2, TABLE_ROWS[3], r4_t0, tl.t)
     tl.pause(0.5)
@@ -438,9 +470,14 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
     tl.say("That completes Lesson 1. Great job, mathematicians!", gap=0.0)
     tl.pause(1.8)
 
+    # and the loop closes the other way: every answer the spec declares
+    # went down exactly once, and the film wrote nothing else
+    spec.assert_written(written)
+
     return SimpleNamespace(tl=tl, keys1=keys1, keys2=keys2, t_cut=t_cut,
                            n_ink_a=n_ink_a, chips=chips, glow1=glow1,
-                           glow2=glow2, figs=figs, wands=wands, marks=marks)
+                           glow2=glow2, figs=figs, wands=wands, marks=marks,
+                           spec=spec, written=written)
 
 
 def main():
@@ -463,9 +500,13 @@ def main():
             print(f"  {s.t0:6.2f}-{s.end:6.2f}  SAY  {s.text[:64]}")
         return
     if mode == "audio":
-        path = f"out/narration_{voice.replace('af_', '').replace('am_', '')}.wav"
-        sf.write(path, tl.mix(), SR)
-        print(path)
+        name = voice.replace("af_", "").replace("am_", "")
+        raw = f"out/narration_{name}_raw.wav"
+        path = f"out/narration_{name}.wav"
+        sf.write(raw, tl.mix(), SR)
+        m = normalize_loudness(raw, path, SR)
+        print(f"{path}  {float(m['input_i']):.1f} → "
+              f"{float(m['output_i']):.1f} LUFS")
         return
 
     ink_a = sorted([s for timed in tl.inks[:f.n_ink_a] for s in timed],
@@ -528,7 +569,11 @@ def main():
 
     video = write_video(f"{name}_silent.mp4", frames(), fps=fps)
     audio = tl.mix()[int(t0 * SR):int(t1 * SR)]
-    sf.write(f"{name}_audio.wav", audio, SR)
+    sf.write(f"{name}_audio_raw.wav", audio, SR)
+    m = normalize_loudness(f"{name}_audio_raw.wav", f"{name}_audio.wav", SR)
+    print(f"  loudness {float(m['input_i']):.1f} → "
+          f"{float(m['output_i']):.1f} LUFS, true peak "
+          f"{float(m['output_tp']):.1f} dBTP")
     out = mux(video, f"{name}_audio.wav", f"{name}.mp4")
     if mode != "clip":
         with open(f"{name}.srt", "w") as fh:

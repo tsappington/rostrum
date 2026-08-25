@@ -50,8 +50,9 @@ Send to **byron.dover@modernclassrooms.org**.
 
 - [ ] Watch the final cut start to finish, sound on, full screen
 - [ ] Partner screening (the 6th-grade proxy) — note anything she flags
-- [ ] Math re-verified: `python -m tools.film schedule` runs clean
-      (spec checks execute on import)
+- [ ] Math re-verified: `python -m rostrum.verify` prints all-pass
+      (it also runs first on every `tools.film` entry point, so a bad
+      number can't reach a render)
 - [ ] Captions spot-checked against audio at 2–3 points
 - [ ] README final read in the browser (GitHub rendering)
 - [ ] Repo public, video link tested logged-out
