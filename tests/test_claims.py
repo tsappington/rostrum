@@ -11,7 +11,6 @@ with no model.
 """
 
 import copy
-import hashlib
 import re
 
 import numpy as np
@@ -153,20 +152,11 @@ def test_loudness_normalization_reaches_target(tmp_path):
 #    (Needs the TTS cache — first run synthesizes it.)
 
 
-def _digest():
-    from tools.film import build
-
-    b = build()
-    h = hashlib.sha256()
-    for s in sorted(b.tl.segs, key=lambda x: x.t0):
-        h.update(f"{s.t0:.6f}|{s.text}".encode())
-    for timed in b.tl.inks:
-        pts = [p for stroke in timed for p in stroke]
-        h.update(f"{min(p.t for p in pts):.6f}|{max(p.t for p in pts):.6f}"
-                 f"|{len(pts)}".encode())
-    return h.hexdigest()
-
-
 @pytest.mark.slow
 def test_two_builds_are_identical():
-    assert _digest() == _digest()
+    # the same function `python -m tools.film digest` prints — so this
+    # test, the README's quoted hash, and a reader's own run are all
+    # comparing the same computation
+    from tools.film import build, digest
+
+    assert digest(build()) == digest(build())

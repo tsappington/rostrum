@@ -178,9 +178,14 @@ never re-synthesizes; a one-line script edit re-voices one line.
 - **The film never names a number.** Every answer on screen comes from
   `Spec.take()`, and `assert_written` confirms at wrap that each declared
   answer was written exactly once and nothing else was.
-- Determinism proven cross-platform: the same commit produced
-  digit-identical timing maps on an Apple-silicon Mac and an x86 Linux
-  container.
+- **Determinism is a ten-second check, not a promise.** `python -m
+  tools.film digest` builds the timing map and prints a SHA-256 over
+  every narration line's start, length, and text at microsecond
+  resolution, plus every ink event's envelope. The shipped cut digests to
+  `69c99429b40ccec37c0207fe2ca2cacac6409ddc6690219a271cfd8840fec049` —
+  the same value from an Apple-silicon Mac and from an x86 Linux
+  container. (The test suite's determinism test is this same function,
+  run twice.)
 - Human screening: watched round by round with a therapist who works
   with children. Several of the film's design laws came directly from
   those screenings (mid-flow fades read as confusion → figures rebuild

@@ -11,7 +11,8 @@ deforms; everything on the student's physical page stays on ours.
 
   python -m tools.film                 # render everything
   python -m tools.film schedule        # print the timing map
-  python -m tools.film captions        # captions only → out/volume_cubes_v3.srt
+  python -m tools.film captions [dst]  # captions only → out/volume_cubes_v3.srt
+  python -m tools.film digest          # SHA-256 of the timing map, any machine
   python -m tools.film audio af_sarah  # narration track only
   python -m tools.film clip A|B|C      # preview clips: A sweeps,
                                        # B vocabulary, C the landing
@@ -19,6 +20,7 @@ deforms; everything on the student's physical page stays on ours.
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import time
 from types import SimpleNamespace
@@ -481,10 +483,26 @@ def build(voice: str = "af_sarah", speed: float = 0.88):
                            spec=spec, written=written)
 
 
+def digest(b) -> str:
+    """SHA-256 over the full timing map: every narration line's start,
+    length, and text at microsecond resolution, plus every ink event's
+    envelope and point count. Two machines printing the same hash will
+    render the same film — the test suite's determinism test is this
+    function run twice, and the README quotes the shipped cut's value."""
+    h = hashlib.sha256()
+    for s in sorted(b.tl.segs, key=lambda x: x.t0):
+        h.update(f"{s.t0:.6f}|{s.dur:.6f}|{s.text}".encode())
+    for timed in b.tl.inks:
+        pts = [p for stroke in timed for p in stroke]
+        h.update(f"{min(p.t for p in pts):.6f}|{max(p.t for p in pts):.6f}"
+                 f"|{len(pts)}".encode())
+    return h.hexdigest()
+
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "render"
-    if mode == "clip":
-        voice, speed = "af_sarah", 0.88
+    if mode in ("clip", "captions", "digest"):
+        voice, speed = "af_sarah", 0.88   # argv[2] is not a voice here
     else:
         voice = sys.argv[2] if len(sys.argv) > 2 else "af_sarah"
         speed = float(sys.argv[3]) if len(sys.argv) > 3 else 0.88
@@ -497,10 +515,13 @@ def main():
           f"{len(f.figs)} figures · {len(f.wands)} wands · {voice} @{speed}")
 
     if mode == "captions":
-        path = "out/volume_cubes_v3.srt"
+        path = sys.argv[2] if len(sys.argv) > 2 else "out/volume_cubes_v3.srt"
         with open(path, "w") as fh:
             fh.write(tl.srt())
         print(path)
+        return
+    if mode == "digest":
+        print(digest(f))
         return
     if mode == "schedule":
         for s in sorted(tl.segs, key=lambda x: x.t0):

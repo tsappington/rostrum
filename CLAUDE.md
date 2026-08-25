@@ -17,7 +17,8 @@ changing what the film *does*.
 ```
 python -m rostrum.verify                # the gate alone: spec vs page vs art
 python -m tools.film schedule           # timing map, no render (gate runs first)
-python -m tools.film captions           # captions only → out/volume_cubes_v3.srt
+python -m tools.film captions [dst]     # captions only → out/volume_cubes_v3.srt
+python -m tools.film digest             # SHA-256 of the timing map, any machine
 python -m tools.film                    # full render → out/volume_cubes_*.mp4 + .srt
 python -m tools.film audio af_sarah     # narration track only (fast; no frames)
 python -m tools.slice                   # Beats 2-3 vertical slice (reference impl)
