@@ -10,3 +10,6 @@ pyyaml>=6.0
 # Hugging Face into the local cache.
 kokoro>=0.9
 soundfile>=0.12
+
+# tests — the README's claims, executable (python -m pytest -q)
+pytest>=8.0
