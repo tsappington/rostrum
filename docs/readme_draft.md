@@ -1,26 +1,15 @@
-# README draft — for Ted's rewrite
-
-> Working draft. The submission README must be in your voice — rewrite
-> freely; the technical facts below are verified against the shipped
-> code. Sections marked ✍️ want your personal register most. The brief
-> says this document anchors the follow-up conversation, so every claim
-> here is one you can defend from the repo.
-
----
-
 # rostrum
 
 **Guided notes in, handwritten walkthrough out.** A deterministic
 Python pipeline that teaches a Modern Classrooms guided-notes lesson
 the way a teacher at a document camera would: a voice that breathes,
-a real hand's ink filling out the actual worksheet, light that follows
+a real hand's ink filling out the actual worksheet, shading that follows
 the teacher's attention, and a rostrum camera that moves with the
 lesson. Nothing generative ever touches a frame.
 
-**The film:** [link] · 4:28 · *Volume with Whole-Number Cubes*
-(Grade 6 · Geometry · Lesson 1 · Skill 1) · 1080p60 · captioned
+**The film:** [Volume with Whole-Number Cubes](https://www.youtube.com/watch?v=iVI2_Lf9GH8) · 4:22 · Grade 6 · Geometry · Lesson 1 · Skill 1 · 1080p60 · captioned
 
-## ✍️ The idea
+## The idea
 
 A rostrum camera is the rig filmmakers use to shoot flat artwork — the
 machine behind every documentary pan across a photograph. This project
@@ -92,11 +81,12 @@ anywhere. Rewrite any line and every cue re-derives on the next build.
 Where the narrator's own prosody isn't enough, the timeline directs
 it:
 
-- **The metronome count.** TTS rushes an in-sentence count (we
-  measured ~0.23s/word at every punctuation), so "Count the rows with
-  me: one… two… three" synthesizes the phrase whole — keeping its
-  natural counting melody — then slices each word out and places the
-  slices on exact ticks, each cueing a row's light and a wand hop.
+- **The metronome count.** TTS rushes an in-sentence count (I measured
+  ~0.23s/word at every punctuation), so the count-alongs — "Let's
+  check it. One, … two, … three. Three rows." — synthesize each phrase
+  whole, keeping its natural counting melody, then slice each word out
+  and place the slices on exact ticks, each cueing one square's light
+  and a wand hop.
 - **The placed breath.** `say(pause_after="five", pause=0.55)`
   splices silence into a sentence at a token boundary and shifts the
   later timestamps — full-sentence prosody with directed pacing
@@ -109,15 +99,36 @@ sync would have needed a separate forced-alignment stage.)
 ## The pipeline
 
 ```
-lesson spec (YAML, machine-checkable answers)
-  └─ verify     65 checks — arithmetic, printed page, printed artwork —
-                before any audio or any frame exists
-  └─ narrate    Kokoro-82M → audio + word timestamps (cached per line)
-  └─ timeline   one clock: narration, ink cues, light, camera, captions
-  └─ geometry   blanks, tables, figures — read from the PDF's vectors
-  └─ ink        captured strokes → placed, timed, pressure-mapped
-  └─ camera     constant-scale rostrum drift over supersampled plates
-  └─ render     2× supersample → 1080p60 → bundled ffmpeg → mp4 + SRT
+lesson/volume_cubes.yaml ──► verify.py — THE GATE: 65 checks (arithmetic ·
+    printed page · printed artwork · capture library) run before any audio
+    or frame exists; every number the film writes is drawn from Spec.take()
+                                            │
+                                            ▼
+assets/guided_notes.pdf ──► page.py ────────┐ blanks by their vector fill signature
+    (true vector)           figures.py ─────┤ cube faces by tone triple, painter order
+                            brand.py ───────┤ palette from the PDF's own fills
+                                            │
+assets/strokes/*.json ────► capture.py ─────┤ take Library: SHA-256(prompt|key) → take,
+    (220 human takes)                       │ plus seeded micro-humanization
+                                            │
+                            tts.py ─────────┤ Kokoro-82M → (audio, word timestamps),
+                                            │ cached per line
+                                            ▼
+                                      timeline.py ── ONE CLOCK
+                                            │  say() · ink() · pause_after
+                                            │  token_start("twelve") → cue time
+                                            ▼
+                  ┌───────────┬─────────────┼─────────────┬───────────┐
+               ink.py      glow.py      figures.py     chip.py    timeline.srt()
+               (paper)     (paper)       (paper)     (glass: chip  (captions)
+                                                       + wand)
+                  └───────────┴─────────────┼─────────────┴───────────┘
+                                            ▼
+                                  render.MovingRostrum
+                       constant-scale crop over a supersampled plate
+                                            ▼
+                  2× downscale → ffmpeg H.264 → loudness-normalized AAC mux
+                                  → .mp4 + .srt
 ```
 
 The worksheet is data, not background: it's a vector PDF, so plates
@@ -132,6 +143,7 @@ Every stage leaves a deterministic, inspectable artifact — the spec,
 the timing map (`python -m tools.film schedule` prints it), the stroke
 library, the per-line TTS cache, the camera keys. Unchanged narration
 never re-synthesizes; a one-line script edit re-voices one line.
+
 
 ## Verification
 
@@ -166,10 +178,8 @@ never re-synthesizes; a one-line script edit re-voices one line.
 - Determinism proven cross-platform: the same commit produced
   digit-identical timing maps on an Apple-silicon Mac and an x86 Linux
   container.
-- ✍️ Human screening: six rounds of notes across the build, watched
-  with [partner], a therapist who works with children — the closest
-  thing a weekend offers to an educator annotation pass. Several of
-  the film's design laws came directly from those screenings (fades
+- Human screening: Screened film for a therapist who works with children.
+  Several of the film's design laws came directly from that screening (fades
   read as confusion → figures only ever *arrive*; a slow spoken count
   promises a pointer → the count-along idiom exists only where the
   wand can point).
@@ -185,20 +195,14 @@ never re-synthesizes; a one-line script edit re-voices one line.
 | **PyYAML** | the machine-checkable lesson spec — the gate's input |
 | **Python 3.12** | everything; single-process by choice |
 | **rostrum ink capture** (built for this) | iPad + Apple Pencil stroke recorder (PointerEvents, pressure, timing) |
-| **Claude Code** | AI pair across the whole build — architecture, implementation, and the revision loop against my screening notes |
-| **Gemini** | one-off second-opinion review of the script draft |
+| **Claude Code** | Fable 5 for architecture, implementation.  Opus 5 for reviewing, testing. |
+| **Gemini** | 3.1 Pro for second-opinion review of the script draft |
 | **Barlow Semi Condensed / Lora** | the worksheet's own faces, for the chip and captions |
 
 Evaluated and not used: **edge-tts** (rejected — see above), **Manim**
 (no animation framework at all: the worksheet's own vector art is the
 animation source), and **generative video/image models** (none — the
 absence is the point: nothing on screen can hallucinate).
-
-✍️ *The Claude Code line deserves a sentence in your own words — an
-AI-forward org will ask about the workflow, in a good way. The honest
-shape of it: you directed, screened, and decided; the AI implemented,
-proposed, and appraised. The screening-notes → design-law loop is the
-story.*
 
 ## Trade-offs, honestly
 
@@ -209,7 +213,7 @@ story.*
   M4 Pro (16 minutes for this film), single-core Python/Pillow. The
   optimization ladder — dirty-rect compositing, multiprocess frame
   ranges, numpy/OpenCV composite — is understood and unneeded at
-  current volume; correctness and inspectability won the weekend.
+  current volume.
 - **TTS prosody has a ceiling.** Kokoro is warm but occasionally
   flattens a line a teacher would lift. Per-line direction (carrier
   words, placed breaths, interrogative framing) recovers a lot — the
@@ -232,8 +236,21 @@ story.*
 - **Pencil pressure through Safari** arrives uncalibrated; each
   writer's personal range is normalized into the ink model's dynamic
   range — relative dynamics preserved, absolute weight standardized.
+- **This took longer than 90 minutes — on purpose.** The 90-minute
+  version exists in this repo: `python -m tools.slice` renders it —
+  one beat of the lesson on the real page, real ink, the word-timestamp
+  sync law already working end to end. That was the honest stopping
+  point for a proof of pipe, and I kept going deliberately, because the
+  interesting problems only appear after the pipe works: does replayed
+  handwriting *feel* human? What does a machine-checkable lesson
+  actually look like? What does a therapist who works with children
+  flag on the fourth screening that I missed on the third? The brief
+  says this README anchors a conversation about the job, so I treated
+  the task as a pilot of the job. The commit history is the record of
+  that choice — every screening note and the design law it became, in
+  order.
 
-## Is this scalable? ✍️ *(they will ask exactly this)*
+## Is this scalable?
 
 **Compute: yes, trivially.** ~16 min/lesson on one Mac, CPU-only, no
 API costs, no shared state — renders parallelize across machines. One
@@ -289,4 +306,4 @@ TTS cache. Same commit, same film, any machine.
 ## License
 
 © 2026 Ted Sappington. Shared for candidate evaluation only — see
-[LICENSE](../LICENSE).
+[LICENSE](LICENSE).
