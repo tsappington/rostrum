@@ -178,9 +178,10 @@ never re-synthesizes; a one-line script edit re-voices one line.
 - Determinism proven cross-platform: the same commit produced
   digit-identical timing maps on an Apple-silicon Mac and an x86 Linux
   container.
-- Human screening: Screened film for a therapist who works with children.
-  Several of the film's design laws came directly from that screening (fades
-  read as confusion → figures only ever *arrive*; a slow spoken count
+- Human screening: watched round by round with a therapist who works
+  with children. Several of the film's design laws came directly from
+  those screenings (mid-flow fades read as confusion → figures rebuild
+  by arrival, *present, clear, build*; a slow spoken count
   promises a pointer → the count-along idiom exists only where the
   wand can point).
 
@@ -238,7 +239,7 @@ absence is the point: nothing on screen can hallucinate).
   range — relative dynamics preserved, absolute weight standardized.
 - **This took longer than 90 minutes — on purpose.** The 90-minute
   version exists in this repo: `python -m tools.slice` renders it —
-  one beat of the lesson on the real page, real ink, the word-timestamp
+  a two-beat slice of the lesson on the real page, real ink, the word-timestamp
   sync law already working end to end. That was the honest stopping
   point for a proof of pipe, and I kept going deliberately, because the
   interesting problems only appear after the pipe works: does replayed
@@ -298,6 +299,7 @@ of the system so much as the definition of the role it was built for.
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m tools.film schedule   # checks + timing map, no render
 .venv/bin/python -m tools.film            # the full film → out/
+.venv/bin/python -m pytest -q             # this README's claims, executable
 ```
 
 First run downloads Kokoro's weights (~330 MB) and builds the per-line
