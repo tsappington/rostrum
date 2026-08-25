@@ -11,6 +11,7 @@ deforms; everything on the student's physical page stays on ours.
 
   python -m tools.film                 # render everything
   python -m tools.film schedule        # print the timing map
+  python -m tools.film captions        # captions only → out/volume_cubes_v3.srt
   python -m tools.film audio af_sarah  # narration track only
   python -m tools.film clip A|B|C      # preview clips: A sweeps,
                                        # B vocabulary, C the landing
@@ -495,6 +496,12 @@ def main():
           f"{len(f.glow1.events) + len(f.glow2.events)} glows · "
           f"{len(f.figs)} figures · {len(f.wands)} wands · {voice} @{speed}")
 
+    if mode == "captions":
+        path = "out/volume_cubes_v3.srt"
+        with open(path, "w") as fh:
+            fh.write(tl.srt())
+        print(path)
+        return
     if mode == "schedule":
         for s in sorted(tl.segs, key=lambda x: x.t0):
             print(f"  {s.t0:6.2f}-{s.end:6.2f}  SAY  {s.text[:64]}")

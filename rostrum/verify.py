@@ -5,7 +5,7 @@ answer to that is to make the machine audit itself, before it makes
 anything — so this module runs first, on every entry point, and the
 build dies here rather than shipping a wrong number.
 
-Three loops close, in widening circles of trust:
+Four loops close, in widening circles of trust:
 
 **Arithmetic.** Every `check` in the lesson spec is evaluated
 symbolically — a tiny AST walker over a whitelist, not `eval` — in a
@@ -32,6 +32,10 @@ confirms. If the spec says Prism 4 is 40 and the art contains 39 cubes,
 one of them is wrong and the build stops. The flat grids are checked
 for *shape*, not just total — the narration says "three rows" and "four
 in each row", so the art has to actually be 3 by 4.
+
+**The capture library.** Every take the spec names must exist in the
+captured stroke data — the film cannot cite handwriting that was never
+written.
 
 Finally, the film reports back. `Spec.take()` is the only way a number
 gets on screen — the shooting script never names one itself — and
@@ -270,7 +274,7 @@ class Spec:
         if bad:
             raise SpecError("film/spec coverage:\n  " + "\n  ".join(bad))
 
-    # ---- the three loops --------------------------------------------------
+    # ---- the four loops ---------------------------------------------------
 
     @staticmethod
     def _names(item: dict, ink: dict) -> dict[str, int]:
@@ -449,4 +453,7 @@ def verify(strokes: dict | None = None, path: str | Path = SPEC_PATH,
 
 
 if __name__ == "__main__":
-    verify()
+    from .capture import load as _load_strokes
+    verify(strokes=_load_strokes(str(
+        SPEC_PATH.parent.parent / "assets" / "strokes"
+        / "capture_ted_v3.json")))

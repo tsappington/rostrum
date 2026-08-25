@@ -116,7 +116,7 @@ class Timeline:
             m, s = divmod(rem, 60)
             return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{int((s % 1) * 1000):03d}"
 
-        def wrap(text: str, width: int = 42) -> str:
+        def wrap(text: str, width: int = 42) -> list[str]:
             words, lines, line = text.split(), [], ""
             for w in words:
                 if line and len(line) + 1 + len(w) > width:
@@ -125,16 +125,31 @@ class Timeline:
                 else:
                     line = f"{line} {w}".strip()
             lines.append(line)
-            return "\n".join(lines[:2]) if len(lines) <= 2 else "\n".join(
-                [lines[0], " ".join(lines[1:])]
-            )
+            return lines
 
+        # a cue is at most two 42-character lines; a longer sentence
+        # becomes several cues in sequence, their boundaries placed by
+        # each chunk's share of the line's spoken span — the words on
+        # screen track the words in the air
+        cues: list[tuple[float, float, str]] = []
+        for s in sorted(self.segs, key=lambda x: x.t0):
+            lines = wrap(s.text)
+            chunks = ["\n".join(lines[i:i + 2])
+                      for i in range(0, len(lines), 2)]
+            spoke0 = s.t0 + (s.tokens[0][1] if s.tokens else 0.0)
+            spoke1 = s.t0 + (s.tokens[-1][2] if s.tokens else s.dur)
+            total = sum(len(c) for c in chunks) or 1
+            t = s.t0
+            for k, c in enumerate(chunks):
+                if k == len(chunks) - 1:
+                    end = s.end + 0.15
+                else:
+                    end = t + (spoke1 - spoke0) * len(c) / total
+                cues.append((t, end, c))
+                t = end
         out = []
-        segs = sorted(self.segs, key=lambda x: x.t0)
-        for i, s in enumerate(segs, 1):
-            end = s.end + 0.15
-            if i < len(segs):                      # cues never overlap: a clip's
-                end = min(end, segs[i].t0 - 0.03)  # silent tail cedes to the next
-            out.append(f"{i}\n{fmt(s.t0)} --> {fmt(max(end, s.t0 + 0.3))}\n"
-                       f"{wrap(s.text)}\n")
+        for i, (a, b, text) in enumerate(cues, 1):
+            if i < len(cues):                      # cues never overlap: a clip's
+                b = min(b, cues[i][0] - 0.03)      # silent tail cedes to the next
+            out.append(f"{i}\n{fmt(a)} --> {fmt(max(b, a + 0.3))}\n{text}\n")
         return "\n".join(out)

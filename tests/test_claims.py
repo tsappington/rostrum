@@ -1,6 +1,6 @@
 """The README's claims, made executable.
 
-Six tests, one per load-bearing claim. This is not a coverage suite —
+Seven tests, one per load-bearing claim. This is not a coverage suite —
 the film's content is guarded by `rostrum.verify` at every build, and
 these tests point the same idea at the machinery: if the README says
 it, something here runs it.
@@ -85,20 +85,34 @@ def test_artwork_counts_match_the_lesson():
 
 
 # ---------------------------------------------------------------------------
-# 5. "Captions from the same timing map… cues never overlap."
+# 5. "Captions from the same timing map" — cues never overlap, and a cue
+#    is at most two 42-character lines (a long sentence becomes several
+#    cues, split over its spoken span).
 
 
 def test_srt_cues_are_monotonic_and_disjoint():
     from rostrum.timeline import Seg, Timeline
     from rostrum.tts import SR
 
+    long = ("Volume counts the unit cubes that fill a solid figure — "
+            "layer by layer by layer — so count one layer, then stack.")
     tl = Timeline.__new__(Timeline)
-    # padded clips whose tails overrun the next line — the clamp's job
+    # padded clips whose tails overrun the next line — the clamp's job —
+    # plus one sentence wide enough to force the multi-cue split
     tl.segs = [Seg(1.0, np.zeros(int(2.0 * SR), np.float32), [], "one"),
                Seg(2.5, np.zeros(int(2.0 * SR), np.float32), [], "two"),
-               Seg(4.0, np.zeros(int(1.0 * SR), np.float32), [], "three")]
+               Seg(4.0, np.zeros(int(1.0 * SR), np.float32), [], "three"),
+               Seg(5.5, np.zeros(int(4.0 * SR), np.float32),
+                   [("Volume", 0.10, 0.42), ("stack.", 3.30, 3.72)], long)]
 
-    stamps = re.findall(r"(\d+):(\d+):(\d+),(\d+)", tl.srt())
+    srt = tl.srt()
+    cues = [c for c in srt.strip().split("\n\n") if c]
+    assert len(cues) > len(tl.segs), "the long sentence never split"
+    for cue in cues:
+        for line in cue.split("\n")[2:]:
+            assert len(line) <= 42, f"caption line too wide: {line!r}"
+
+    stamps = re.findall(r"(\d+):(\d+):(\d+),(\d+)", srt)
     t = [int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
          for h, m, s, ms in stamps]
     starts, ends = t[0::2], t[1::2]

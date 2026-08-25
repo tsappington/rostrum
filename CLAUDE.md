@@ -17,6 +17,7 @@ changing what the film *does*.
 ```
 python -m rostrum.verify                # the gate alone: spec vs page vs art
 python -m tools.film schedule           # timing map, no render (gate runs first)
+python -m tools.film captions           # captions only → out/volume_cubes_v3.srt
 python -m tools.film                    # full render → out/volume_cubes_*.mp4 + .srt
 python -m tools.film audio af_sarah     # narration track only (fast; no frames)
 python -m tools.slice                   # Beats 2-3 vertical slice (reference impl)
@@ -51,12 +52,13 @@ lines.
 - **Never hand-edit `assets/strokes/*.json`.** That's captured human
   data with provenance; corrections belong in ingestion code.
 - **Verification precedes rendering.** `rostrum.verify` runs before any
-  audio or any frame exists, and the build dies there. Three loops close:
+  audio or any frame exists, and the build dies there. Four loops close:
   every spec `check` is evaluated symbolically against that item's own
   measurements (never a tautology — `L * D * H == 24`, not `2 == 2`); the
-  printed page is re-read and must agree; and the illustrations are
+  printed page is re-read and must agree; the illustrations are
   counted out of the PDF's vector data, so `volume` has a witness that
-  was never derived from the arithmetic it confirms. The film never names
+  was never derived from the arithmetic it confirms; and every take the
+  spec names must exist in the captured stroke data. The film never names
   a number itself — it asks `Spec.take()`, and `assert_written` confirms
   at wrap that every declared answer went down exactly once. A number no
   source can prove does not reach a frame.

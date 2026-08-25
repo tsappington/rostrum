@@ -58,7 +58,7 @@ rather than simulating it: real velocity, real hesitations, pressure
 mapped to ink width.
 
 - **No two instances are identical.** Repeating numbers (this lesson
-  writes 12 five times) draw different takes from the library —
+  writes 12 six times) draw different takes from the library —
   round-robin, the way drum machines escaped the "machine-gun
   effect" — plus hair's-width seeded jitters of scale, rotation,
   baseline, pace, and pressure. The variation is deterministic: same
@@ -149,7 +149,7 @@ never re-synthesizes; a one-line script edit re-voices one line.
 
 - **65 checks run before a single second of audio exists**, and the
   build dies there if any fails (`python -m rostrum.verify`). They close
-  three loops:
+  four loops:
   - **Arithmetic (20).** Every spec `check` is evaluated symbolically —
     a small AST walker over a whitelist, not `eval` — in a namespace
     bound from that item's own measurements. `L * D * H == 24` against
@@ -168,10 +168,13 @@ never re-synthesizes; a one-line script edit re-voices one line.
     was never derived from the arithmetic it confirms: 12, 12, 24, 40.
     The grids are checked for *shape*, not just total — the narration
     says "three rows" and "four in each row", so the art has to be 3×4.
-  This is what catches the failure that arithmetic alone can't: misread
-  a dimension off an isometric drawing and every equation still balances.
-  Change `gp3` to 4×3×3 and the checks pass — until the artwork says 24
-  cubes and the build stops.
+  - **The capture library (20).** Every take the spec names must exist
+    in the captured stroke data — the film cannot cite handwriting that
+    was never written.
+  The artwork loop is what catches the failure arithmetic alone can't:
+  misread a dimension off an isometric drawing and every equation still
+  balances. Change `gp3` to 4×3×3 and the checks pass — until the
+  artwork says 24 cubes and the build stops.
 - **The film never names a number.** Every answer on screen comes from
   `Spec.take()`, and `assert_written` confirms at wrap that each declared
   answer was written exactly once and nothing else was.
@@ -264,7 +267,7 @@ vector PDF. Captions are a by-product.
 
 **QA: scales because of determinism.** 65 checks run before frames
 exist; same input, same film; reviewing the spec reviews the video.
-Two of the three loops — the printed page and its artwork — need no
+Two of the four loops — the printed page and its artwork — need no
 per-lesson authoring at all: they read whatever PDF they're given.
 There is no hallucination surface to audit.
 
@@ -293,6 +296,26 @@ choreography, a new idiom — needs a human architect and a screening
 pass, exactly the loop that shaped this film. That's not a limitation
 of the system so much as the definition of the role it was built for.
 
+## Where things live
+
+```
+lesson/volume_cubes.yaml    the machine-checkable lesson spec — the gate's input
+rostrum/                    the pipeline: verify (the gate), page (PDF plates +
+                            geometry), capture (the take Library), ink, tts,
+                            timeline, glow, figures, chip (the glass), render
+tools/film.py               the film itself, beat by beat — the directed part
+tools/slice.py              the 90-minute version — the two-beat proof of pipe
+tools/capture/index.html    the iPad stroke recorder — one self-contained HTML
+                            file; open it in a browser, write, export
+assets/guided_notes.pdf     the worksheet, true vector
+assets/strokes/             the captured handwriting (never hand-edited)
+docs/treatment.md           the film's creative spine — every beat, and why
+tests/                      this README's claims, executable
+```
+
+The early spikes (`tools/spike_*.py`, `tools/casting/`) are kept
+deliberately — the commit history is part of the submission.
+
 ## Reproducing
 
 ```
@@ -304,6 +327,12 @@ python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 First run downloads Kokoro's weights (~330 MB) and builds the per-line
 TTS cache. Same commit, same film, any machine.
+
+(Known gap, on purpose: `requirements.txt` floats unpinned — at this
+scale I wanted current libraries, and the cross-platform proof above
+ran against them. "Same film" strictly means same commit *and* same
+resolved environment; the first thing a production deployment adds is
+a lockfile.)
 
 ## License
 
