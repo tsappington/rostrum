@@ -183,5 +183,6 @@ when we *can't* see every cube. See you there."
   from the page's own 2-D art (endpoints would still register to
   print). Designed, estimated, and deferred under the deadline.
 - **Fade transitions on figures** — tried (v2), rejected in screening:
-  a viewer reads fade-out as "what just happened?"; replaced by the
-  arrival-only grammar above.
+  a viewer reads a mid-flow fade-out as "what just happened?". The one
+  fade that survived is the announced reset that opens each build —
+  see the present-clear-build grammar above.
