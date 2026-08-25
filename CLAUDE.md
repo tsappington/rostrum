@@ -40,7 +40,7 @@ lines.
 - `tools/` — `film.py` is the movie, beat by beat; `capture/index.html`
   is the iPad stroke recorder (published as a Claude artifact)
 - `assets/strokes/` — captured handwriting (see invariants)
-- `docs/` — treatment, README draft, submission checklist
+- `docs/` — the treatment (the film's creative spine)
 
 ## Invariants — do not break
 
