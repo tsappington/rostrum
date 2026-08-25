@@ -45,14 +45,15 @@ times: **volume is a count, not an appearance — area, stacked.**
   replays in stages — "3" lands on the third count, "× 4" on the
   fourth column, "= 12" at the multiply — split at the take's own
   glyph gaps, so the equation builds with the count that proves it.
-- **Figures (arrival-only):** the illustration panels are the one place
-  the page comes alive, and their grammar is a single verb — *arrive*.
-  The vocabulary box starts blank and cubes pack it as she says
-  "packed"; Prism 3 sits as prism one until its second layer descends
-  on "stacked". Nothing on the page ever fades out — disappearance
-  means nothing in this lesson, while packing and stacking are the
-  lesson. Drawn cubes are pixel-registered to the print, so a finished
-  figure retires with no transition at all.
+- **Figures (present, clear, build):** the illustration panels are the
+  one place the page comes alive. A printed figure stays on screen
+  exactly as it sits on the student's own sheet until the narration
+  reaches it, fades clear in one announced reset, then rebuilds by
+  arrival: the vocabulary box packs cube by cube on "packed"; Prism 3
+  drops layer one on "it's prism one" and layer two on "stacked".
+  During a build nothing is ever seen leaving — packing and stacking
+  are the lesson. Drawn cubes are pixel-registered to the print, so a
+  finished figure retires with no transition at all.
 - **The glass:** two citizens, both gesture, both orange. The pause
   chip ("you act now") and the wand ("look here") — a dot that pops in,
   hops with each spoken count, double-pulses on the last one like a
@@ -74,6 +75,9 @@ times: **volume is a count, not an appearance — area, stacked.**
   not emitted.)
 
 ## Beat sheet
+
+*The plan. The shipped cut runs 4:22 — `python -m tools.film schedule`
+prints the as-built map.*
 
 | # | Beat | Camera | Runtime | Cumulative |
 |---|------|--------|---------|-----------|
