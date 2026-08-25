@@ -65,9 +65,10 @@ lines.
   nothing synthetic goes on the paper except ink and the page's own
   idioms. Glass citizens are gesture, not content — they never write
   or teach. Page light is ink-blue; orange belongs to the glass.
-- **Arrival-only figures.** Inside the illustration windows, cubes only
-  ever arrive (pack, stack); nothing printed is ever seen fading out.
-  The patch covers a figure's print from frame one, and a finished
+- **Figures: present, clear, build.** A printed figure stays on screen
+  exactly as on the student's sheet until the narration reaches it,
+  fades clear in one announced reset, then rebuilds by arrival (pack,
+  stack) — during the build nothing is ever seen leaving. A finished
   figure retires with no transition because drawn == print.
 - **Marks anchor to their own ink.** A take's position always comes from
   its ink bottom; only *scale* may borrow guide geometry
