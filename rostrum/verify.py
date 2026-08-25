@@ -50,6 +50,7 @@ from __future__ import annotations
 import ast
 import operator
 import re
+import sys
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -447,8 +448,10 @@ def verify(strokes: dict | None = None, path: str | Path = SPEC_PATH,
         raise SpecError(f"{len(fail)} check(s) failed:\n  "
                         + "\n  ".join(fail))
     if not quiet:
+        # status, not data — stderr keeps every mode's stdout pipe-clean
+        # (`tools.film digest | shasum` sees the hash and nothing else)
         print("verify · " + " · ".join(f"{v} {k}" for k, v in counts.items())
-              + " · all pass")
+              + " · all pass", file=sys.stderr)
     return spec
 
 

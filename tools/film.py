@@ -509,10 +509,13 @@ def main():
     f = build(voice, speed)
     tl, t_cut = f.tl, f.t_cut
     total = tl.t
+    # the fingerprint is status, like verify's line — stderr, so every
+    # mode's stdout carries only its data
     print(f"total {total:.1f}s ({total/60:.1f} min) · cut at {t_cut:.1f}s · "
           f"{len(tl.segs)} lines · {len(tl.inks)} ink events · "
           f"{len(f.glow1.events) + len(f.glow2.events)} glows · "
-          f"{len(f.figs)} figures · {len(f.wands)} wands · {voice} @{speed}")
+          f"{len(f.figs)} figures · {len(f.wands)} wands · {voice} @{speed}",
+          file=sys.stderr)
 
     if mode == "captions":
         path = sys.argv[2] if len(sys.argv) > 2 else "out/volume_cubes_v3.srt"

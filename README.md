@@ -236,11 +236,12 @@ absence is the point: nothing on screen can hallucinate).
   where content can't be asserted, the gate thins to human review.
 - **Loudness is capped by the crest, not by choice.** The mix is
   normalized to a broadcast target (two-pass ITU-R BS.1770) rather than
-  to a peak, which took it from -23.2 to -15.5 LUFS. It doesn't reach
-  -14: unprocessed TTS speech runs a wide crest with hot samples spread
-  across the whole film, so the straight +9 dB would breach the
-  true-peak ceiling. The ceiling wins, loudness range comes through
-  intact (3.8 → 4.6 LU), and every render prints what it actually
+  to a peak, lifting the raw mix from -23.2 LUFS to a delivered master
+  that measures -15.1 LUFS, 4.7 LU of range, and a -1.2 dBFS peak
+  (ebur128, on the file). It doesn't reach -14: unprocessed TTS speech
+  runs a wide crest with hot samples spread across the whole film, so
+  the straight +9 dB would breach the true-peak ceiling. The ceiling
+  wins, the dynamics survive, and every render prints what it actually
   achieved rather than what it asked for.
 - **Pencil pressure through Safari** arrives uncalibrated; each
   writer's personal range is normalized into the ink model's dynamic
@@ -326,6 +327,7 @@ deliberately — the commit history is part of the submission.
 ```
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m tools.film schedule   # checks + timing map, no render
+.venv/bin/python -m tools.film digest     # the hash quoted above, any machine
 .venv/bin/python -m tools.film            # the full film → out/
 .venv/bin/python -m pytest -q             # this README's claims, executable
 ```
